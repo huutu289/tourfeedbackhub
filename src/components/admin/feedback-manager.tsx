@@ -71,7 +71,8 @@ export default function FeedbackManager() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [summary, setSummary] = useState<{ content: string; language: string } | null>(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
-  const [isActing, setIsActing] = useState(false);
+  const [actionState, setActionState] = useState<{ id: string; type: 'approve' | 'reject' } | null>(null);
+  const isActing = Boolean(actionState);
 
   const pendingQuery = useMemoFirebase(
     () =>
@@ -98,40 +99,82 @@ export default function FeedbackManager() {
   };
 
   const handleApprove = async (id: string) => {
+    let actionToast: ReturnType<typeof toast> | undefined;
     try {
-      setIsActing(true);
+      setActionState({ id, type: 'approve' });
+      actionToast = toast({
+        title: 'Approving feedback...',
+        description: 'Publishing this story for travellers to read.',
+        duration: 60000,
+      });
       await approveFeedback(id);
-      toast({
-        title: "Feedback Approved",
-        description: "The feedback is now public.",
-      });
+      if (actionToast) {
+        actionToast.update({
+          id: actionToast.id,
+          title: 'Feedback approved',
+          description: 'The feedback is now public.',
+          duration: 5000,
+        });
+      }
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : 'Failed to approve feedback.',
-        variant: "destructive",
-      });
+      const description = error instanceof Error ? error.message : 'Failed to approve feedback.';
+      if (actionToast) {
+        actionToast.update({
+          id: actionToast.id,
+          title: 'Approval failed',
+          description,
+          variant: 'destructive',
+          duration: 6000,
+        });
+      } else {
+        toast({
+          title: 'Approval failed',
+          description,
+          variant: 'destructive',
+        });
+      }
     } finally {
-      setIsActing(false);
+      setActionState(null);
     }
   };
 
   const handleReject = async (id: string) => {
+    let actionToast: ReturnType<typeof toast> | undefined;
     try {
-      setIsActing(true);
+      setActionState({ id, type: 'reject' });
+      actionToast = toast({
+        title: 'Rejecting feedback...',
+        description: 'Removing this submission from the queue.',
+        duration: 60000,
+      });
       await rejectFeedback(id);
-      toast({
-        title: "Feedback Rejected",
-        description: "The feedback has been removed.",
-      });
+      if (actionToast) {
+        actionToast.update({
+          id: actionToast.id,
+          title: 'Feedback rejected',
+          description: 'The feedback has been removed.',
+          duration: 5000,
+        });
+      }
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : 'Failed to reject feedback.',
-        variant: "destructive",
-      });
+      const description = error instanceof Error ? error.message : 'Failed to reject feedback.';
+      if (actionToast) {
+        actionToast.update({
+          id: actionToast.id,
+          title: 'Rejection failed',
+          description,
+          variant: 'destructive',
+          duration: 6000,
+        });
+      } else {
+        toast({
+          title: 'Rejection failed',
+          description,
+          variant: 'destructive',
+        });
+      }
     } finally {
-      setIsActing(false);
+      setActionState(null);
     }
   };
 
@@ -201,8 +244,17 @@ export default function FeedbackManager() {
                         className="text-green-600 hover:text-green-700"
                         onClick={() => handleApprove(item.id)}
                         disabled={isActing}
+                        aria-busy={actionState?.id === item.id && actionState.type === 'approve'}
                       >
-                        <CheckCircle className="w-4 h-4 mr-1" /> Approve
+                        {actionState?.id === item.id && actionState.type === 'approve' ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-1 animate-spin" /> Approving...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="w-4 h-4 mr-1" /> Approve
+                          </>
+                        )}
                       </Button>
                       <Button
                         variant="ghost"
@@ -210,8 +262,17 @@ export default function FeedbackManager() {
                         className="text-red-600 hover:text-red-700"
                         onClick={() => handleReject(item.id)}
                         disabled={isActing}
+                        aria-busy={actionState?.id === item.id && actionState.type === 'reject'}
                       >
-                        <XCircle className="w-4 h-4 mr-1" /> Reject
+                        {actionState?.id === item.id && actionState.type === 'reject' ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-1 animate-spin" /> Rejecting...
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="w-4 h-4 mr-1" /> Reject
+                          </>
+                        )}
                       </Button>
                     </TableCell>
                   </TableRow>
