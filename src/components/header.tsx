@@ -9,6 +9,7 @@ import {
   SheetContent,
   SheetTrigger,
   SheetClose,
+  SheetTitle,
 } from '@/components/ui/sheet';
 
 const baseNavLinks = [
@@ -66,6 +67,7 @@ export default function Header() {
                 </Button>
               </SheetTrigger>
               <SheetContent side="right">
+                <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
                 <div className="p-6">
                   <Link href="/" className="mr-6 flex items-center space-x-2 mb-8">
                      <MessageSquare className="h-6 w-6 text-accent" />
