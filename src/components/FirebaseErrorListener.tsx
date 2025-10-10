@@ -29,9 +29,11 @@ export function FirebaseErrorListener() {
     };
   }, []);
 
-  // On re-render, if an error exists in state, throw it.
+  // On re-render, if an error exists in state, log it as a warning (don't throw to avoid crashes).
   if (error) {
-    throw error;
+    console.warn('Firestore Permission Error (ignoring):', error.request.path);
+    // Clear the error so it doesn't keep logging
+    setError(null);
   }
 
   // This component renders nothing.

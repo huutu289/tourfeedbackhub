@@ -1,0 +1,11 @@
+# robots.txt for Tour Insights Hub
+
+User-agent: *
+Allow: /
+
+# Disallow admin pages
+Disallow: /admin/
+Disallow: /admin/*
+
+# Sitemap
+Sitemap: https://tourfeedbackhub.web.app/sitemap.xml
