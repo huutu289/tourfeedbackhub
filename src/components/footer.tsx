@@ -1,7 +1,12 @@
 import Link from "next/link";
-import { MessageSquare, Twitter, Facebook, Instagram } from "lucide-react";
+import { MessageSquare, Facebook, Instagram, Mail, Phone, MessageCircle } from "lucide-react";
+import type { ContactInfo } from "@/lib/types";
 
-export default function Footer() {
+interface FooterProps {
+  contact: ContactInfo;
+}
+
+export default function Footer({ contact }: FooterProps) {
   return (
     <footer className="bg-secondary/50 border-t">
       <div className="container mx-auto px-4 py-8">
@@ -20,8 +25,13 @@ export default function Footer() {
               <h4 className="font-semibold font-body">Navigate</h4>
               <ul className="mt-4 space-y-2 text-muted-foreground">
                 <li><Link href="/" className="hover:text-accent">Home</Link></li>
+                <li><Link href="/about" className="hover:text-accent">About</Link></li>
+                <li><Link href="/tour-types" className="hover:text-accent">Tour Types</Link></li>
+                <li><Link href="/tours" className="hover:text-accent">Tours</Link></li>
+                <li><Link href="/stories" className="hover:text-accent">Stories</Link></li>
                 <li><Link href="/reviews" className="hover:text-accent">Reviews</Link></li>
                 <li><Link href="/feedback" className="hover:text-accent">Leave Feedback</Link></li>
+                <li><Link href="/contact" className="hover:text-accent">Contact</Link></li>
               </ul>
             </div>
              <div>
@@ -42,10 +52,30 @@ export default function Footer() {
             </div>
             <div>
               <h4 className="font-semibold font-body">Connect</h4>
-              <div className="mt-4 flex gap-4">
-                <Link href="#" aria-label="Twitter"><Twitter className="h-6 w-6 text-muted-foreground hover:text-accent" /></Link>
-                <Link href="#" aria-label="Facebook"><Facebook className="h-6 w-6 text-muted-foreground hover:text-accent" /></Link>
-                <Link href="#" aria-label="Instagram"><Instagram className="h-6 w-6 text-muted-foreground hover:text-accent" /></Link>
+              <div className="mt-4 space-y-2 text-muted-foreground">
+                {contact.email && (
+                  <p className="flex items-center gap-2">
+                    <Mail className="h-4 w-4" />
+                    <Link href={`mailto:${contact.email}`} className="hover:text-accent">{contact.email}</Link>
+                  </p>
+                )}
+                {contact.phone && (
+                  <p className="flex items-center gap-2">
+                    <Phone className="h-4 w-4" />
+                    <Link href={`tel:${contact.phone}`} className="hover:text-accent">{contact.phone}</Link>
+                  </p>
+                )}
+                <div className="flex gap-3 pt-2 text-foreground/70">
+                  {contact.whatsapp && (
+                    <Link href={contact.whatsapp} aria-label="WhatsApp" className="hover:text-accent"><MessageCircle className="h-6 w-6" /></Link>
+                  )}
+                  {contact.facebook && (
+                    <Link href={contact.facebook} aria-label="Facebook" className="hover:text-accent"><Facebook className="h-6 w-6" /></Link>
+                  )}
+                  {contact.instagram && (
+                    <Link href={contact.instagram} aria-label="Instagram" className="hover:text-accent"><Instagram className="h-6 w-6" /></Link>
+                  )}
+                </div>
               </div>
             </div>
           </div>
