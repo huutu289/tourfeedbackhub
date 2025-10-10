@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef } from 'react';
 import Image from 'next/image';
 import {
   Table,
@@ -61,7 +61,6 @@ const tourSchema = z.object({
   summary: z.string().min(1, 'Summary is required'),
   durationLabel: z.string().min(1, 'Duration is required'),
   priceFrom: z.coerce.number().min(0, 'Price must be a positive number'),
-  mediaFiles: z.any().optional(),
 });
 
 type TourFormValues = z.infer<typeof tourSchema>;
@@ -71,7 +70,10 @@ async function getUploadUrl(
   fileName: string,
   fileType: string
 ): Promise<{ uploadUrl: string; publicUrl: string }> {
-  const res = await fetch(`${functionsBaseUrl}/admin-generate-upload-url`, {
+  if (!functionsBaseUrl) {
+    throw new Error('Cloud Functions base URL is not configured.');
+  }
+  const res = await fetch(`${functionsBaseUrl}/adminGenerateUploadUrl`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -80,9 +82,15 @@ async function getUploadUrl(
     body: JSON.stringify({ fileName, fileType }),
   });
   if (!res.ok) {
-    throw new Error('Failed to get upload URL');
+    const errorBody = await res.text();
+    console.error('Failed to get upload URL:', errorBody);
+    throw new Error(`Failed to get upload URL: ${res.statusText}`);
   }
-  return res.json();
+  const data = await res.json();
+  if (!data.success) {
+    throw new Error(data.error?.message || 'Failed to get upload URL from function.');
+  }
+  return data;
 }
 
 async function uploadFile(
@@ -98,7 +106,7 @@ async function uploadFile(
   });
 }
 
-function mapTour(doc: WithId<any>): Tour {
+function mapTour(doc: WithId<any>): WithId<Tour> {
   return {
     id: doc.id,
     name: doc.name ?? 'Untitled Tour',
@@ -116,6 +124,7 @@ export default function AdminToursPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedTour, setSelectedTour] = useState<WithId<Tour> | null>(null);
+  const mediaFileInputRef = useRef<HTMLInputElement>(null);
 
   const toursQuery = useMemoFirebase(
     () => collection(firestore, 'tours'),
@@ -135,7 +144,6 @@ export default function AdminToursPage() {
       summary: '',
       durationLabel: '',
       priceFrom: 0,
-      mediaFiles: undefined,
     },
   });
 
@@ -157,7 +165,6 @@ export default function AdminToursPage() {
       summary: '',
       durationLabel: '',
       priceFrom: 0,
-      mediaFiles: undefined,
     });
     setIsDialogOpen(true);
   };
@@ -179,12 +186,11 @@ export default function AdminToursPage() {
       const tourRef = doc(firestore, 'tours', id);
       
       let newMediaUrls: string[] = [];
+      const mediaFiles = mediaFileInputRef.current?.files;
 
-      if (values.mediaFiles && values.mediaFiles.length > 0) {
-        const uploadPromises = Array.from(values.mediaFiles as FileList).map(async (file: File) => {
-          // 1. Get signed URL
+      if (mediaFiles && mediaFiles.length > 0) {
+        const uploadPromises = Array.from(mediaFiles).map(async (file: File) => {
           const { uploadUrl, publicUrl } = await getUploadUrl(idToken, `tours/${id}/${file.name}`, file.type);
-          // 2. Upload file to signed URL
           await uploadFile(uploadUrl, file);
           return publicUrl;
         });
@@ -341,34 +347,25 @@ export default function AdminToursPage() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="mediaFiles"
-                render={({ field: { onChange, ...rest } }) => (
-                  <FormItem>
-                    <FormLabel>Media (Images/Videos)</FormLabel>
-                     {selectedTour?.mediaUrls && (
-                       <div className="mt-2 flex flex-wrap gap-2">
-                         {selectedTour.mediaUrls.map((url) => (
-                            <Image key={url} src={url} alt="Current media" width={80} height={60} className="rounded-md object-cover" />
-                         ))}
-                       </div>
-                    )}
-                    <FormControl>
-                      <Input
-                        type="file"
-                        accept="image/*,video/*"
-                        multiple
-                        onChange={e => {
-                          onChange(e.target.files);
-                        }}
-                        {...rest}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+              <div className="space-y-2">
+                 <FormLabel>Media (Images/Videos)</FormLabel>
+                 {selectedTour?.mediaUrls && selectedTour.mediaUrls.length > 0 && (
+                   <div className="mt-2 flex flex-wrap gap-2">
+                     {selectedTour.mediaUrls.map((url) => (
+                        <Image key={url} src={url} alt="Current media" width={80} height={60} className="rounded-md object-cover" />
+                     ))}
+                   </div>
                 )}
-              />
+                <FormControl>
+                  <Input
+                    type="file"
+                    accept="image/*,video/*"
+                    multiple
+                    ref={mediaFileInputRef}
+                  />
+                </FormControl>
+                <FormMessage />
+              </div>
               <DialogFooter>
                 <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
                 <Button type="submit" disabled={isSubmitting}>
