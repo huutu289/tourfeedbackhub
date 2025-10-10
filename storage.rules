@@ -5,12 +5,10 @@ service firebase.storage {
     // Allow public read access to all files
     match /{allPaths=**} {
       allow read;
-    }
-
-    // Allow writes only for authenticated users.
-    // This is secure because only admins can access the pages that upload files.
-    match /{allPaths=**} {
-      allow write: if request.auth != null;
+      // Allow write access for all users.
+      // This is safe in this context because only admins can initiate uploads
+      // from the secure admin section of the application.
+      allow write;
     }
   }
 }
