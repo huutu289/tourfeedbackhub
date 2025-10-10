@@ -87,8 +87,14 @@ export default function FeedbackForm({ tours }: FeedbackFormProps) {
       return;
     }
 
+    let submissionToast: ReturnType<typeof toast> | undefined;
     try {
       setIsSubmitting(true);
+      submissionToast = toast({
+        title: "Submitting feedback...",
+        description: "Please wait while we share your travel story.",
+        duration: 60000,
+      });
       const recaptchaToken = await execute();
       const photoFile = data.photo && data.photo.length > 0 ? (data.photo[0] as File) : null;
 
@@ -113,18 +119,33 @@ export default function FeedbackForm({ tours }: FeedbackFormProps) {
         photoFile
       );
 
-      toast({
-        title: "Feedback Submitted!",
-        description: "Thank you for sharing your experience with us.",
-      });
+      if (submissionToast) {
+        submissionToast.update({
+          id: submissionToast.id,
+          title: "Feedback submitted",
+          description: "Thank you for sharing your experience with us.",
+          duration: 5000,
+        });
+      }
       form.reset();
     } catch (error) {
       console.error("Feedback submission error:", error);
-      toast({
-        title: "Submission Failed",
-        description: error instanceof Error ? error.message : "An unexpected error occurred.",
-        variant: "destructive",
-      });
+      const description = error instanceof Error ? error.message : "An unexpected error occurred.";
+      if (submissionToast) {
+        submissionToast.update({
+          id: submissionToast.id,
+          title: "Submission failed",
+          description,
+          variant: "destructive",
+          duration: 6000,
+        });
+      } else {
+        toast({
+          title: "Submission failed",
+          description,
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -275,9 +296,9 @@ export default function FeedbackForm({ tours }: FeedbackFormProps) {
           )}
         />
 
-        <Button type="submit" size="lg" disabled={isSubmitting || !isRecaptchaReady}>
+        <Button type="submit" size="lg" disabled={isSubmitting || !isRecaptchaReady} aria-busy={isSubmitting}>
           {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Submit Feedback
+          {isSubmitting ? "Submitting..." : "Submit Feedback"}
         </Button>
       </form>
     </Form>
