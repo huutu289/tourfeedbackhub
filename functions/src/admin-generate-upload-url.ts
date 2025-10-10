@@ -10,7 +10,8 @@ import { getStorage } from "firebase-admin/storage";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
 /**
@@ -88,3 +89,5 @@ export const adminGenerateUploadUrl = onRequest(
     }
   }
 );
+
+    
