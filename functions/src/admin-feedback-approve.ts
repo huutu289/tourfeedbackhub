@@ -14,12 +14,6 @@ import { onRequest } from "firebase-functions/v2/https";
 import { removePII, generateDisplayName } from "./utils";
 import type { FeedbackDocument, ReviewDocument } from "./types";
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, X-Firebase-AppCheck, Authorization",
-};
-
 interface ApprovePayload {
   feedbackId: string;
 }
@@ -58,20 +52,11 @@ async function getAuthToken(authHeader: string | undefined): Promise<admin.auth.
 export const adminFeedbackApprove = onRequest(
   {
     region: "us-central1",
-    cors: true,
+    cors: true, // Use built-in CORS handling
     maxInstances: 10,
     memory: "512MiB",
   },
   async (request, response) => {
-    // Handle CORS preflight
-    if (request.method === "OPTIONS") {
-      response.set(CORS_HEADERS);
-      response.status(204).send("");
-      return;
-    }
-
-    response.set(CORS_HEADERS);
-
     // Only accept POST
     if (request.method !== "POST") {
       response.status(405).json({
@@ -239,5 +224,3 @@ export const adminFeedbackApprove = onRequest(
     }
   }
 );
-
-    

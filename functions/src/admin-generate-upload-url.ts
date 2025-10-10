@@ -8,12 +8,6 @@ import * as admin from "firebase-admin";
 import { onRequest } from "firebase-functions/v2/https";
 import { getStorage } from "firebase-admin/storage";
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
-
 /**
  * Verify that the user is an admin
  */
@@ -43,16 +37,9 @@ async function getAuthToken(authHeader: string | undefined): Promise<admin.auth.
 export const adminGenerateUploadUrl = onRequest(
   {
     region: "us-central1",
-    cors: true,
+    cors: true, // Use built-in CORS handling
   },
   async (request, response) => {
-    if (request.method === "OPTIONS") {
-      response.set(CORS_HEADERS);
-      response.status(204).send();
-      return;
-    }
-    response.set(CORS_HEADERS);
-    
     if (request.method !== "POST") {
       response.status(405).json({ success: false, error: { message: "Only POST requests are allowed" } });
       return;
@@ -89,5 +76,3 @@ export const adminGenerateUploadUrl = onRequest(
     }
   }
 );
-
-    

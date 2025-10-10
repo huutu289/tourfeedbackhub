@@ -14,29 +14,14 @@ import { onRequest } from "firebase-functions/v2/https";
 import { verifyAppCheck, verifyRecaptcha, checkRateLimit, sanitizeInput, validateFileMetadata } from "./utils";
 import type { FeedbackSubmitPayload, FeedbackDocument, FeedbackSubmitResponse, UploadDetails } from "./types";
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*", // In production, restrict to your domain
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, X-Firebase-AppCheck, X-Recaptcha-Token",
-};
-
 export const feedbackSubmit = onRequest(
   {
     region: "us-central1",
-    cors: true,
+    cors: true, // Use built-in CORS handling
     maxInstances: 10,
     memory: "256MiB",
   },
   async (request, response) => {
-    // Handle CORS preflight
-    if (request.method === "OPTIONS") {
-      response.set(CORS_HEADERS);
-      response.status(204).send("");
-      return;
-    }
-
-    response.set(CORS_HEADERS);
-
     // Only accept POST
     if (request.method !== "POST") {
       response.status(405).json({
@@ -225,5 +210,3 @@ export const feedbackSubmit = onRequest(
     }
   }
 );
-
-    
