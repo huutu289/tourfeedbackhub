@@ -1,3 +1,7 @@
+
+'use client';
+
+import { useMemo, useState } from 'react';
 import {
   Table,
   TableBody,
@@ -5,70 +9,295 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { MoreHorizontal } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { getPublicContent } from "@/lib/content-service";
+} from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { MoreHorizontal, Loader2 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import { useFirestore } from '@/firebase/provider';
+import { collection, doc, setDoc } from 'firebase/firestore';
+import { useCollection, type WithId } from '@/firebase/firestore/use-collection';
+import { useMemoFirebase } from '@/firebase/firestore/use-memo-firebase';
+import type { Tour } from '@/lib/types';
+import { setDocumentNonBlocking } from '@/firebase';
 
-export default async function AdminToursPage() {
-  const { tours } = await getPublicContent();
+// Schema for the tour form
+const tourSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  summary: z.string().min(1, 'Summary is required'),
+  durationLabel: z.string().min(1, 'Duration is required'),
+  priceFrom: z.coerce.number().min(0, 'Price must be a positive number'),
+  coverImageUrl: z.string().url('Must be a valid URL').optional().or(z.literal('')),
+});
+
+type TourFormValues = z.infer<typeof tourSchema>;
+
+function mapTour(doc: WithId<any>): Tour {
+  return {
+    id: doc.id,
+    name: doc.name ?? 'Untitled Tour',
+    summary: doc.summary ?? '',
+    durationLabel: doc.durationLabel ?? '',
+    priceFrom: Number(doc.priceFrom) || 0,
+    coverImageUrl: doc.coverImageUrl ?? '',
+  };
+}
+
+export default function AdminToursPage() {
+  const firestore = useFirestore();
+  const { toast } = useToast();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedTour, setSelectedTour] = useState<WithId<Tour> | null>(null);
+
+  const toursQuery = useMemoFirebase(
+    () => collection(firestore, 'tours'),
+    [firestore]
+  );
+  const { data, isLoading } = useCollection(toursQuery);
+
+  const tours = useMemo(() => {
+    if (!data) return [];
+    return data.map(mapTour);
+  }, [data]);
+
+  const form = useForm<TourFormValues>({
+    resolver: zodResolver(tourSchema),
+    defaultValues: {
+      name: '',
+      summary: '',
+      durationLabel: '',
+      priceFrom: 0,
+      coverImageUrl: '',
+    },
+  });
+
+  const handleEdit = (tour: WithId<Tour>) => {
+    setSelectedTour(tour);
+    form.reset({
+      name: tour.name,
+      summary: tour.summary,
+      durationLabel: tour.durationLabel,
+      priceFrom: tour.priceFrom,
+      coverImageUrl: tour.coverImageUrl,
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleAddNew = () => {
+    setSelectedTour(null);
+    form.reset();
+    setIsDialogOpen(true);
+  };
+
+  const onSubmit = async (values: TourFormValues) => {
+    setIsSubmitting(true);
+    try {
+      const id = selectedTour ? selectedTour.id : doc(collection(firestore, 'tours')).id;
+      const tourRef = doc(firestore, 'tours', id);
+      
+      const tourData = {
+        ...values,
+        id,
+      };
+
+      setDocumentNonBlocking(tourRef, tourData, { merge: true });
+
+      toast({
+        title: selectedTour ? 'Tour Updated' : 'Tour Created',
+        description: `"${values.name}" has been saved.`,
+      });
+      setIsDialogOpen(false);
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Save Failed',
+        description: error instanceof Error ? error.message : 'An unexpected error occurred.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-headline font-bold">Manage Tours</h1>
-          <p className="text-muted-foreground">
-            Add, edit, or remove tour packages.
-          </p>
+    <>
+      <div className="space-y-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-headline font-bold">Manage Tours</h1>
+            <p className="text-muted-foreground">Add, edit, or remove tour packages.</p>
+          </div>
+          <Button onClick={handleAddNew}>Add New Tour</Button>
         </div>
-        <Button>Add New Tour</Button>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl font-headline">Published Tours</CardTitle>
+            <CardDescription>Data is sourced directly from Firestore.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tour Name</TableHead>
+                  <TableHead>Duration</TableHead>
+                  <TableHead>Price (from)</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="h-24 text-center">
+                      <Loader2 className="mx-auto h-6 w-6 animate-spin text-accent" />
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  tours.map(tour => (
+                    <TableRow key={tour.id}>
+                      <TableCell className="font-medium">{tour.name}</TableCell>
+                      <TableCell>{tour.durationLabel}</TableCell>
+                      <TableCell>${tour.priceFrom}</TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">Open menu</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => handleEdit(tour)}>Edit</DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xl font-headline">Published Teasers</CardTitle>
-          <CardDescription>Data is sourced directly from Firestore tour teasers.</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tour Name</TableHead>
-                <TableHead>Duration</TableHead>
-                <TableHead>Price (from)</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tours.map((tour) => (
-                <TableRow key={tour.id}>
-                  <TableCell className="font-medium">{tour.name}</TableCell>
-                  <TableCell>{tour.durationLabel}</TableCell>
-                  <TableCell>${tour.priceFrom}</TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem>Edit</DropdownMenuItem>
-                        <DropdownMenuItem>Delete</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </div>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{selectedTour ? 'Edit Tour' : 'Add New Tour'}</DialogTitle>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tour Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="summary"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Summary</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="durationLabel"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Duration</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="e.g., 5 days" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="priceFrom"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Price (from)</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="coverImageUrl"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cover Image URL</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="https://..." />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
