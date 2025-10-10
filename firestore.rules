@@ -1,0 +1,75 @@
+/**
+ * @file Firestore Security Rules for TourFeedbackHub.
+ *
+ * @core_philosophy This ruleset uses App Check to protect all collections.
+ *  All write operations require a valid App Check token, effectively restricting
+ *  data modification to authorized clients. All collections are publicly readable.
+ *
+ * @data_structure
+ *  - `/site_settings/{siteSettingsId}`: Stores global site settings.
+ *  - `/tour_types/{tourTypeId}`: Stores tour types.
+ *  - `/tours/{tourId}`: Stores tour information.
+ *  - `/feedback/{feedbackId}`: Stores user feedback.
+ *
+ * @key_security_decisions
+ *  - All write operations are protected by App Check to prevent unauthorized modifications.
+ *  - Read operations are public.
+ *  - No user-specific data or ownership models are enforced at the rule level.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Controls access to the /site_settings collection.
+     * @path /site_settings/{siteSettingsId}
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) Requires valid App Check token.
+     * @deny (create, update, delete) No App Check token provided.
+     * @principle Protects against unauthorized data modifications in site settings.
+     */
+    match /site_settings/{siteSettingsId} {
+      allow get, list: if true;
+      allow create, update, delete: if request.app != null;
+    }
+
+    /**
+     * @description Controls access to the /tour_types collection.
+     * @path /tour_types/{tourTypeId}
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) Requires valid App Check token.
+     * @deny (create, update, delete) No App Check token provided.
+     * @principle Protects against unauthorized data modifications in tour types.
+     */
+    match /tour_types/{tourTypeId} {
+      allow get, list: if true;
+      allow create, update, delete: if request.app != null;
+    }
+
+    /**
+     * @description Controls access to the /tours collection.
+     * @path /tours/{tourId}
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) Requires valid App Check token.
+     * @deny (create, update, delete) No App Check token provided.
+     * @principle Protects against unauthorized data modifications in tours.
+     */
+    match /tours/{tourId} {
+      allow get, list: if true;
+      allow create, update, delete: if request.app != null;
+    }
+
+    /**
+     * @description Controls access to the /feedback collection.
+     * @path /feedback/{feedbackId}
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) Requires valid App Check token.
+     * @deny (create, update, delete) No App Check token provided.
+     * @principle Protects against unauthorized data modifications in feedback.
+     */
+    match /feedback/{feedbackId} {
+      allow get, list: if true;
+      allow create, update, delete: if request.app != null;
+    }
+  }
+}

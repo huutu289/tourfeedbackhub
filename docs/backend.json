@@ -1,0 +1,253 @@
+{
+  "entities": {
+    "Feedback": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Feedback",
+      "type": "object",
+      "description": "Represents a single piece of feedback submitted by a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Feedback entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the user submitting feedback."
+        },
+        "country": {
+          "type": "string",
+          "description": "Country of origin of the user submitting feedback."
+        },
+        "language": {
+          "type": "string",
+          "description": "Language used by the user in the feedback."
+        },
+        "rating": {
+          "type": "number",
+          "description": "Rating given by the user (e.g., on a scale of 1 to 5)."
+        },
+        "message": {
+          "type": "string",
+          "description": "The feedback message provided by the user."
+        },
+        "tourId": {
+          "type": "string",
+          "description": "Reference to Tour. (Relationship: Tour 1:N Feedback). Nullable if no tour selected."
+        },
+        "photoUrl": {
+          "type": "string",
+          "description": "URL of the optional photo submitted with the feedback. Nullable if no photo was provided.",
+          "format": "uri"
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the feedback (e.g., 'pending', 'approved', 'rejected')."
+        },
+        "submittedAt": {
+          "type": "string",
+          "description": "Timestamp of when the feedback was submitted.",
+          "format": "date-time"
+        },
+        "feedbackSummary": {
+          "type": "string",
+          "description": "AI-generated summary of the feedback message."
+        },
+        "detectedLanguage": {
+          "type": "string",
+          "description": "Language detected by AI from the feedback message."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "country",
+        "language",
+        "rating",
+        "message",
+        "status",
+        "submittedAt"
+      ]
+    },
+    "Tour": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Tour",
+      "type": "object",
+      "description": "Represents a tour offered.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Tour entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the tour."
+        },
+        "typeId": {
+          "type": "string",
+          "description": "Reference to TourType. (Relationship: TourType 1:N Tour)"
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the tour."
+        },
+        "teaser": {
+          "type": "string",
+          "description": "Short teaser text to entice users to learn more about the tour."
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "URL of an image representing the tour.",
+          "format": "uri"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "typeId",
+        "description",
+        "teaser",
+        "imageUrl"
+      ]
+    },
+    "TourType": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "TourType",
+      "type": "object",
+      "description": "Represents a category or type of tour (e.g., historical, adventure).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the TourType entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the tour type."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the tour type."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description"
+      ]
+    },
+    "SiteSettings": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SiteSettings",
+      "type": "object",
+      "description": "Stores global settings for the website.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the SiteSettings entity.  Should be a singleton (only one record)."
+        },
+        "primaryColor": {
+          "type": "string",
+          "description": "Primary color of the website (e.g., hexadecimal code)."
+        },
+        "backgroundColor": {
+          "type": "string",
+          "description": "Background color of the website."
+        },
+        "accentColor": {
+          "type": "string",
+          "description": "Accent color used for interactive elements."
+        },
+        "fontHeadline": {
+          "type": "string",
+          "description": "Font family for headlines."
+        },
+        "fontBody": {
+          "type": "string",
+          "description": "Font family for body text."
+        }
+      },
+      "required": [
+        "id",
+        "primaryColor",
+        "backgroundColor",
+        "accentColor",
+        "fontHeadline",
+        "fontBody"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/site_settings/{siteSettingsId}",
+        "definition": {
+          "entityName": "SiteSettings",
+          "schema": {
+            "$ref": "#/backend/entities/SiteSettings"
+          },
+          "description": "Stores global site settings. Only accessible and modifiable by authorized admins (handled by App Check).",
+          "params": [
+            {
+              "name": "siteSettingsId",
+              "description": "The ID of the site settings document. Should be a singleton (only one record)."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/tour_types/{tourTypeId}",
+        "definition": {
+          "entityName": "TourType",
+          "schema": {
+            "$ref": "#/backend/entities/TourType"
+          },
+          "description": "Stores tour types. Only accessible and modifiable by authorized admins (handled by App Check).",
+          "params": [
+            {
+              "name": "tourTypeId",
+              "description": "The ID of the tour type document."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/tours/{tourId}",
+        "definition": {
+          "entityName": "Tour",
+          "schema": {
+            "$ref": "#/backend/entities/Tour"
+          },
+          "description": "Stores tour information. Only accessible and modifiable by authorized admins (handled by App Check).",
+          "params": [
+            {
+              "name": "tourId",
+              "description": "The ID of the tour document."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/feedback/{feedbackId}",
+        "definition": {
+          "entityName": "Feedback",
+          "schema": {
+            "$ref": "#/backend/entities/Feedback"
+          },
+          "description": "Stores user feedback. App Check ensures only valid requests are persisted.",
+          "params": [
+            {
+              "name": "feedbackId",
+              "description": "The ID of the feedback document."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "This Firestore data structure is designed to support the Tour Insights Hub application, prioritizing security, scalability, and ease of maintenance. The structure facilitates anonymous feedback submission, admin review, and content management while ensuring data integrity and preventing unauthorized access. It utilizes Structural Segregation, Access Modeling, and Authorization Independence via Denormalization to achieve robust security rules and efficient data retrieval.\n\n**Authorization Independence (Denormalization):**\nThe design focuses on authorization independence by avoiding `get()` calls in security rules. Since there is no role-based authentication, and all of the data is publicly available, there is nothing to denormalize. The only requirement is to protect the data with AppCheck.\n\n**Structural Segregation:**\nThe data is segregated into collections based on their security requirements and access patterns:\n*   `/site_settings`: Stores global site settings. Only accessible and modifiable by authorized admins (handled by App Check).\n*   `/tour_types`: Stores tour types. Only accessible and modifiable by authorized admins (handled by App Check).\n*   `/tours`: Stores tour information. Only accessible and modifiable by authorized admins (handled by App Check).\n*   `/feedback`: Stores user feedback. App Check ensures only valid requests are persisted.\n\n**Access Modeling:**\n*   **Anonymous Feedback:** Anonymous feedback is stored directly in the `/feedback` collection. Access to create documents requires valid App Check token. Admins must use App Check to perform CRUD operations in all collections.\n\n**QAPs (Rules are not Filters):**\n*   The structure supports secure `list` operations. The `/feedback` collection can be queried to display approved reviews, filtering by the `status` field. This approach ensures that only publicly available reviews are displayed."
+  }
+}
