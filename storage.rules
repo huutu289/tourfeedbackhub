@@ -2,34 +2,27 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
+    
+    // Function to check if the user is an admin by checking Firestore
+    function isAdmin() {
+      return exists(/databases/(default)/documents/admins/$(request.auth.uid));
+    }
 
-    // --- Publicly readable content ---
-    // Media for reviews and public assets
+    // Public files are readable by anyone
     match /public/{allPaths=**} {
-      allow read;
+      allow read: if true;
+      allow write: if false; // No public writes
     }
 
-    // Media for tours should be publicly readable
+    // Tour media can be read by anyone, but only written by admins
     match /tours/{tourId}/{allPaths=**} {
-      allow read;
-      // Allow writes only by authenticated admin users
-      allow write: if request.auth != null && request.auth.token.admin == true;
+      allow read: if true;
+      allow write: if request.auth != null && isAdmin();
     }
-
-    // --- Admin-only content ---
-    // For sensitive files not meant for public view
-    match /private/{allPaths=**} {
-      allow read, write: if request.auth != null && request.auth.token.admin == true;
-    }
-
-    // --- Temporary uploads for feedback submissions ---
-    // These files are typically handled via signed URLs from a Cloud Function.
-    // The rules ensure only the function can create them and they are not publicly accessible.
-    match /uploads/tmp/{feedbackId}/{fileName} {
-       // Allow create if the user is authenticated (via App Check from the client function)
-       // and the file size is reasonable. A real-world app would have stricter
-       // validation, likely via signed URLs.
-       allow create: if request.auth != null && request.resource.size < 5 * 1024 * 1024;
+    
+    // Fallback: deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
     }
   }
 }

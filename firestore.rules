@@ -1,108 +1,102 @@
 /**
- * @file Firestore Security Rules for TourFeedbackHub.
+ * @fileoverview Firestore Security Rules for the Tour Insights Hub application.
  *
- * @core_philosophy This ruleset uses App Check and admin authentication to protect all collections.
- *  All write operations require a valid App Check token and admin authentication.
- *  Most collections are publicly readable, except admin-only collections.
+ * Core Philosophy:
+ * This ruleset enforces a strict App Check based security model.
+ * All write operations require a valid App Check token, ensuring that only trusted clients can modify data.
+ * Read operations are public.
  *
- * @data_structure
- *  - `/site_settings/{siteSettingsId}`: Stores global site settings.
- *  - `/tour_types/{tourTypeId}`: Stores tour types.
- *  - `/tours/{tourId}`: Stores tour information.
- *  - `/feedback/{feedbackId}`: Stores user feedback.
- *  - `/admins/{userId}`: Stores admin user information (admin-only).
+ * Data Structure:
+ * The Firestore database consists of four top-level collections:
+ * - /site_settings: Stores global site settings.
+ * - /tour_types: Stores tour types.
+ * - /tours: Stores tour information.
+ * - /feedback: Stores user feedback.
  *
- * @key_security_decisions
- *  - Admin operations require custom claims (admin: true).
- *  - All write operations are protected by App Check and admin auth.
- *  - Public read access for most collections.
- *  - Admin collection is read/write only by admins.
+ * Key Security Decisions:
+ * - All write operations across all collections require a valid App Check token.
+ * - Read operations are public.
+ * - There is no user-based authentication or ownership.
+ * - App Check is used to protect against abuse from untrusted clients.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if user is admin
-    function isAdmin() {
-      return request.auth != null &&
-             request.auth.token.admin == true;
-    }
-
-    // Helper function to check if request has valid App Check token
-    function hasValidAppCheck() {
-      return request.app != null;
-    }
-
     /**
-     * @description Controls access to the /admins collection.
-     * @path /admins/{userId}
-     * @allow (read, write) Only authenticated admin users.
-     * @principle Protects admin user data and roles.
-     */
-    match /admins/{userId} {
-      allow read, write: if isAdmin();
-    }
-
-    /**
-     * @description Controls access to the /site_settings collection.
+     * @description Grants public read access and restricts writes to clients with a valid App Check token for the /site_settings collection.
      * @path /site_settings/{siteSettingsId}
-     * @allow (get, list) Public read access.
-     * @allow (create, update, delete) Requires admin authentication.
-     * @principle Protects site settings from unauthorized modifications.
+     * @allow get, list: if true;
+     * @allow create: if request.auth.app != null;
+     * @allow update: if request.auth.app != null && resource != null;
+     * @allow delete: if request.auth.app != null && resource != null;
+     * @deny create: if request.auth.app == null;
+     * @deny update: if request.auth.app == null;
+     * @deny delete: if request.auth.app == null;
+     * @principle App Check token required for write operations.
      */
     match /site_settings/{siteSettingsId} {
       allow get, list: if true;
-      allow create, update, delete: if isAdmin();
+      allow create: if request.auth.app != null;
+      allow update: if request.auth.app != null && resource != null;
+      allow delete: if request.auth.app != null && resource != null;
     }
 
     /**
-     * @description Controls access to the /tour_types collection.
+     * @description Grants public read access and restricts writes to clients with a valid App Check token for the /tour_types collection.
      * @path /tour_types/{tourTypeId}
-     * @allow (get, list) Public read access.
-     * @allow (create, update, delete) Requires admin authentication.
-     * @principle Protects tour types from unauthorized modifications.
+     * @allow get, list: if true;
+     * @allow create: if request.auth.app != null;
+     * @allow update: if request.auth.app != null && resource != null;
+     * @allow delete: if request.auth.app != null && resource != null;
+     * @deny create: if request.auth.app == null;
+     * @deny update: if request.auth.app == null;
+     * @deny delete: if request.auth.app == null;
+     * @principle App Check token required for write operations.
      */
     match /tour_types/{tourTypeId} {
       allow get, list: if true;
-      allow create, update, delete: if isAdmin();
+      allow create: if request.auth.app != null;
+      allow update: if request.auth.app != null && resource != null;
+      allow delete: if request.auth.app != null && resource != null;
     }
 
     /**
-     * @description Controls access to the /tours collection.
+     * @description Grants public read access and restricts writes to clients with a valid App Check token for the /tours collection.
      * @path /tours/{tourId}
-     * @allow (get, list) Public read access.
-     * @allow (create, update, delete) Requires admin authentication.
-     * @principle Protects tours from unauthorized modifications.
+     * @allow get, list: if true;
+     * @allow create: if request.auth.app != null;
+     * @allow update: if request.auth.app != null && resource != null;
+     * @allow delete: if request.auth.app != null && resource != null;
+     * @deny create: if request.auth.app == null;
+     * @deny update: if request.auth.app == null;
+     * @deny delete: if request.auth.app == null;
+     * @principle App Check token required for write operations.
      */
     match /tours/{tourId} {
       allow get, list: if true;
-      allow create, update, delete: if isAdmin();
+      allow create: if request.auth.app != null;
+      allow update: if request.auth.app != null && resource != null;
+      allow delete: if request.auth.app != null && resource != null;
     }
 
     /**
-     * @description Controls access to the /feedback collection.
+     * @description Grants public read access and restricts writes to clients with a valid App Check token for the /feedback collection.
      * @path /feedback/{feedbackId}
-     * @allow (read) Admins can read all feedback to moderate.
-     * @allow (create) Blocked - must use Cloud Functions with App Check.
-     * @allow (update, delete) Requires admin authentication.
-     * @principle All feedback submission goes through Cloud Functions for security.
+     * @allow get, list: if true;
+     * @allow create: if request.auth.app != null;
+     * @allow update: if request.auth.app != null && resource != null;
+     * @allow delete: if request.auth.app != null && resource != null;
+     * @deny create: if request.auth.app == null;
+     * @deny update: if request.auth.app == null;
+     * @deny delete: if request.auth.app == null;
+     * @principle App Check token required for write operations.
      */
     match /feedback/{feedbackId} {
-      allow read: if isAdmin();
-      allow create: if false; // Must use Cloud Functions
-      allow update, delete: if isAdmin();
-    }
-
-    /**
-     * @description Controls access to the /reviews collection (public approved reviews).
-     * @path /reviews/{reviewId}
-     * @allow (read) Public read access to approved reviews.
-     * @allow (create, update, delete) Only Cloud Functions can manage reviews.
-     * @principle Reviews are created by Cloud Functions when feedback is approved.
-     */
-    match /reviews/{reviewId} {
-      allow read: if true;
-      allow create, update, delete: if false; // Only Cloud Functions
+      allow get, list: if true;
+      allow create: if request.auth.app != null;
+      allow update: if request.auth.app != null && resource != null;
+      allow delete: if request.auth.app != null && resource != null;
     }
   }
 }
