@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Map,
   MessageSquare,
   Settings,
   Star,
+  LogOut,
 } from "lucide-react";
 
 import {
@@ -23,6 +24,7 @@ import {
   SidebarGroupLabel,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/firebase/provider";
 
 const menuItems = [
   {
@@ -53,6 +55,13 @@ const menuItems = [
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const auth = useAuth();
+
+  const handleLogout = async () => {
+    await auth.signOut();
+    router.push('/admin/login');
+  };
 
   return (
     <Sidebar collapsible="icon">
@@ -90,12 +99,16 @@ export function AdminSidebar() {
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
+      <SidebarFooter className="flex flex-col gap-2">
         <Button variant="ghost" className="w-full justify-start gap-2" asChild>
           <Link href="/">
             <Settings />
-            <span>Back to Site</span>
+            <span className="group-data-[collapsible=icon]:hidden">Back to Site</span>
           </Link>
+        </Button>
+        <Button variant="ghost" className="w-full justify-start gap-2" onClick={handleLogout}>
+            <LogOut />
+            <span className="group-data-[collapsible=icon]:hidden">Log Out</span>
         </Button>
       </SidebarFooter>
     </Sidebar>
