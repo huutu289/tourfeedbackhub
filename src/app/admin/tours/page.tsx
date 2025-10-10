@@ -101,7 +101,7 @@ export default function AdminToursPage() {
       summary: '',
       durationLabel: '',
       priceFrom: 0,
-      mediaFiles: null,
+      mediaFiles: undefined,
     },
   });
 
@@ -123,7 +123,7 @@ export default function AdminToursPage() {
       summary: '',
       durationLabel: '',
       priceFrom: 0,
-      mediaFiles: null,
+      mediaFiles: undefined,
     });
     setIsDialogOpen(true);
   };
@@ -299,7 +299,7 @@ export default function AdminToursPage() {
               <FormField
                 control={form.control}
                 name="mediaFiles"
-                render={({ field: { onChange, ...rest } }) => (
+                render={({ field: { onChange, value, ...rest } }) => (
                   <FormItem>
                     <FormLabel>Media (Images/Videos)</FormLabel>
                      {selectedTour?.mediaUrls && (
