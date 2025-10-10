@@ -1,3 +1,46 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "hero-image",
+      "description": "A stunning mountain landscape at sunrise, representing adventure and travel.",
+      "imageUrl": "https://picsum.photos/seed/hero/1920/1080",
+      "imageHint": "mountain landscape"
+    },
+    {
+      "id": "tour-mountain",
+      "description": "A serene view of mountains with a clear lake in the foreground.",
+      "imageUrl": "https://picsum.photos/seed/mountain/600/400",
+      "imageHint": "mountain lake"
+    },
+    {
+      "id": "tour-coastal",
+      "description": "A dramatic coastline with cliffs and waves crashing.",
+      "imageUrl": "https://picsum.photos/seed/coast/600/400",
+      "imageHint": "coastal cliffs"
+    },
+    {
+      "id": "tour-city",
+      "description": "A bustling city street at night with light trails from traffic.",
+      "imageUrl": "https://picsum.photos/seed/city/600/400",
+      "imageHint": "city night"
+    },
+    {
+      "id": "review-banner",
+      "description": "A diverse group of happy travelers taking a selfie.",
+      "imageUrl": "https://picsum.photos/seed/travelers/800/600",
+      "imageHint": "happy travelers"
+    },
+    {
+      "id": "feedback-hero",
+      "description": "A person writing in a journal with a scenic background.",
+      "imageUrl": "https://picsum.photos/seed/feedback/1920/500",
+      "imageHint": "writing travel"
+    },
+    {
+      "id": "reviews-hero",
+      "description": "A wall covered in postcards and photos from travels.",
+      "imageUrl": "https://picsum.photos/seed/reviews/1920/500",
+      "imageHint": "travel postcards"
+    }
+  ]
 }
