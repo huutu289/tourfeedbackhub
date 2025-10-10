@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -49,20 +48,19 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase/provider';
-import { collection, doc, setDoc } from 'firebase/firestore';
+import { collection, doc } from 'firebase/firestore';
 import { useCollection, type WithId } from '@/firebase/firestore/use-collection';
 import { useMemoFirebase } from '@/firebase/firestore/use-memo-firebase';
 import type { Tour } from '@/lib/types';
 import { setDocumentNonBlocking } from '@/firebase';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
-// Schema for the tour form
 const tourSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   summary: z.string().min(1, 'Summary is required'),
   durationLabel: z.string().min(1, 'Duration is required'),
   priceFrom: z.coerce.number().min(0, 'Price must be a positive number'),
-  coverImage: z.any().optional(),
+  mediaFiles: z.any().optional(),
 });
 
 type TourFormValues = z.infer<typeof tourSchema>;
@@ -74,7 +72,7 @@ function mapTour(doc: WithId<any>): Tour {
     summary: doc.summary ?? '',
     durationLabel: doc.durationLabel ?? '',
     priceFrom: Number(doc.priceFrom) || 0,
-    coverImageUrl: doc.coverImageUrl ?? '',
+    mediaUrls: Array.isArray(doc.mediaUrls) ? doc.mediaUrls : [],
   };
 }
 
@@ -103,7 +101,7 @@ export default function AdminToursPage() {
       summary: '',
       durationLabel: '',
       priceFrom: 0,
-      coverImage: null,
+      mediaFiles: null,
     },
   });
 
@@ -114,7 +112,6 @@ export default function AdminToursPage() {
       summary: tour.summary,
       durationLabel: tour.durationLabel,
       priceFrom: tour.priceFrom,
-      coverImage: tour.coverImageUrl,
     });
     setIsDialogOpen(true);
   };
@@ -126,7 +123,7 @@ export default function AdminToursPage() {
       summary: '',
       durationLabel: '',
       priceFrom: 0,
-      coverImage: null,
+      mediaFiles: null,
     });
     setIsDialogOpen(true);
   };
@@ -137,15 +134,16 @@ export default function AdminToursPage() {
       const id = selectedTour ? selectedTour.id : doc(collection(firestore, 'tours')).id;
       const tourRef = doc(firestore, 'tours', id);
       
-      let coverImageUrl = selectedTour?.coverImageUrl || '';
+      let newMediaUrls: string[] = [];
 
-      // Check if a new file is uploaded
-      if (values.coverImage && values.coverImage[0] instanceof File) {
-        const file = values.coverImage[0] as File;
+      if (values.mediaFiles && values.mediaFiles.length > 0) {
         const storage = getStorage();
-        const storageRef = ref(storage, `tours/${id}/${file.name}`);
-        const uploadResult = await uploadBytes(storageRef, file);
-        coverImageUrl = await getDownloadURL(uploadResult.ref);
+        const uploadPromises = Array.from(values.mediaFiles as FileList).map(async (file: File) => {
+          const storageRef = ref(storage, `tours/${id}/${file.name}`);
+          const uploadResult = await uploadBytes(storageRef, file);
+          return getDownloadURL(uploadResult.ref);
+        });
+        newMediaUrls = await Promise.all(uploadPromises);
       }
 
       const tourData = {
@@ -153,7 +151,7 @@ export default function AdminToursPage() {
         summary: values.summary,
         durationLabel: values.durationLabel,
         priceFrom: values.priceFrom,
-        coverImageUrl,
+        mediaUrls: [...(selectedTour?.mediaUrls || []), ...newMediaUrls],
         id,
       };
 
@@ -175,8 +173,6 @@ export default function AdminToursPage() {
       setIsSubmitting(false);
     }
   };
-
-  const currentCoverImage = form.watch('coverImage');
 
   return (
     <>
@@ -302,17 +298,19 @@ export default function AdminToursPage() {
               />
               <FormField
                 control={form.control}
-                name="coverImage"
-                render={({ field: { onChange, value, ...rest } }) => (
+                name="mediaFiles"
+                render={({ field: { onChange, ...rest } }) => (
                   <FormItem>
-                    <FormLabel>Cover Image</FormLabel>
-                    {selectedTour?.coverImageUrl && typeof currentCoverImage === 'string' && (
-                       <div className="mt-2">
-                         <Image src={currentCoverImage} alt="Current cover image" width={120} height={90} className="rounded-md object-cover" />
+                    <FormLabel>Media (Images/Videos)</FormLabel>
+                     {selectedTour?.mediaUrls && (
+                       <div className="mt-2 flex flex-wrap gap-2">
+                         {selectedTour.mediaUrls.map((url) => (
+                            <Image key={url} src={url} alt="Current media" width={80} height={60} className="rounded-md object-cover" />
+                         ))}
                        </div>
                     )}
                     <FormControl>
-                      <Input type="file" accept="image/*" onChange={(e) => onChange(e.target.files)} {...rest} />
+                      <Input type="file" accept="image/*,video/*" multiple onChange={(e) => onChange(e.target.files)} {...rest} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

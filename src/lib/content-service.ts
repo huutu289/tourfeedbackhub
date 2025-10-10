@@ -69,7 +69,7 @@ function mapTour(doc: FirestoreDocument): Tour {
     summary: data.summary ?? data.description ?? "",
     durationLabel: data.durationLabel ?? data.duration ?? "",
     priceFrom: typeof data.priceFrom === "number" ? data.priceFrom : Number(data.priceFrom) || 0,
-    coverImageUrl: data.coverImageUrl ?? data.heroImageUrl ?? "",
+    mediaUrls: Array.isArray(data.mediaUrls) ? data.mediaUrls : [data.coverImageUrl ?? ""],
     tourTypeIds: Array.isArray(data.tourTypeIds) ? data.tourTypeIds : undefined,
     languages: Array.isArray(data.languages) ? data.languages : undefined,
     highlights: Array.isArray(data.highlights) ? data.highlights : undefined,

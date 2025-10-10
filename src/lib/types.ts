@@ -12,7 +12,7 @@ export interface Tour {
   summary: string;
   durationLabel: string;
   priceFrom: number;
-  coverImageUrl: string;
+  mediaUrls: string[]; // Changed from coverImageUrl
   tourTypeIds?: string[];
   languages?: string[];
   highlights?: string[];

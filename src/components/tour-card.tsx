@@ -10,13 +10,14 @@ interface TourCardProps {
 }
 
 export default function TourCard({ tour }: TourCardProps) {
+  const coverImage = tour.mediaUrls?.[0];
   return (
     <Card className="flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300">
       <CardHeader className="p-0">
         <div className="relative h-56 w-full">
-          {tour.coverImageUrl && (
+          {coverImage && (
             <Image
-              src={tour.coverImageUrl}
+              src={coverImage}
               alt={tour.name}
               fill
               className="object-cover"
