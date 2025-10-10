@@ -19,7 +19,8 @@ function buildCredential() {
   const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
 
   if (!projectId || !clientEmail || !privateKey) {
-    throw new Error("Missing Firebase Admin credentials. Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY.");
+    // Return null instead of throwing, so the caller can handle the fallback.
+    return null;
   }
 
   return {
@@ -29,19 +30,35 @@ function buildCredential() {
   };
 }
 
-export function initializeFirebaseAdmin(): FirebaseAdminServices {
-  if (!global.__FIREBASE_ADMIN_APP__) {
-    const credentials = buildCredential();
+export function initializeFirebaseAdmin(): FirebaseAdminServices | null {
+  if (global.__FIREBASE_ADMIN_APP__) {
+    const app = global.__FIREBASE_ADMIN_APP__;
+    return {
+      app,
+      firestore: getFirestore(app),
+      storage: getStorage(app),
+    };
+  }
+
+  const credentials = buildCredential();
+  if (!credentials) {
+    return null; // Gracefully fail if credentials are not available.
+  }
+
+  try {
     global.__FIREBASE_ADMIN_APP__ = initializeApp({
       credential: cert(credentials),
       storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
     });
+  
+    const app = global.__FIREBASE_ADMIN_APP__;
+    return {
+      app,
+      firestore: getFirestore(app),
+      storage: getStorage(app),
+    };
+  } catch (error) {
+    console.warn("Firebase Admin initialization failed", error);
+    return null;
   }
-
-  const app = global.__FIREBASE_ADMIN_APP__;
-  return {
-    app,
-    firestore: getFirestore(app),
-    storage: getStorage(app),
-  };
 }

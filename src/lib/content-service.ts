@@ -107,14 +107,16 @@ function mapReview(doc: FirestoreDocument): Review {
 }
 
 async function fetchCollection(collectionPath: string): Promise<FirestoreDocument[]> {
-  const { firestore } = initializeFirebaseAdmin();
-  const snapshot = await firestore.collection(collectionPath).get();
+  const admin = initializeFirebaseAdmin();
+  if (!admin) return [];
+  const snapshot = await admin.firestore.collection(collectionPath).get();
   return snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
 }
 
 async function fetchApprovedReviews(): Promise<Review[]> {
-  const { firestore } = initializeFirebaseAdmin();
-  const snapshot = await firestore
+  const admin = initializeFirebaseAdmin();
+  if (!admin) return [];
+  const snapshot = await admin.firestore
     .collection("reviews")
     .where("status", "==", "approved")
     .orderBy("createdAt", "desc")
@@ -124,8 +126,9 @@ async function fetchApprovedReviews(): Promise<Review[]> {
 }
 
 async function fetchSiteSettings(): Promise<SiteSettings> {
-  const { firestore } = initializeFirebaseAdmin();
-  const docRef = firestore.collection("siteSettings").doc("public");
+  const admin = initializeFirebaseAdmin();
+  if (!admin) return fallbackSiteSettings;
+  const docRef = admin.firestore.collection("siteSettings").doc("public");
   const snapshot = await docRef.get();
   return mapSiteSettings(snapshot.data());
 }

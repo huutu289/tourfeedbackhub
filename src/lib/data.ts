@@ -5,7 +5,7 @@ export const siteSettings: SiteSettings = {
   heroSubtitle:
     "Your honest reflections help us refine every itinerary and craft unforgettable moments for future travellers.",
   heroCtaLabel: "Leave a Review",
-  heroMediaUrl: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=80",
+  heroMediaUrl: "https://picsum.photos/seed/1/1600/900",
   aboutTitle: "Guiding Boutique Adventures Across Vietnam",
   aboutDescription:
     "I am Trang, your private tour designer. From hidden mountain retreats to coastal culinary escapes, I curate bespoke experiences grounded in local expertise and heartfelt hospitality.",
@@ -63,7 +63,7 @@ export const tours: Tour[] = [
       "A five-day escape through Da Lat's pine forests and cozy tea houses, blending wellness, coffee culture, and artisan workshops.",
     durationLabel: "5 days",
     priceFrom: 890,
-    coverImageUrl: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=80",
+    coverImageUrl: "https://picsum.photos/seed/2/1600/900",
     tourTypeIds: ["boutique", "heritage"],
     highlights: ["Private hydrotherapy session", "Sunrise forest hike", "Chef-led farm-to-table dinner"],
   },
@@ -74,7 +74,7 @@ export const tours: Tour[] = [
       "Sail translucent waters, savour coastal cuisine, and reconnect with artisans preserving ancient lantern craft.",
     durationLabel: "4 days",
     priceFrom: 760,
-    coverImageUrl: "https://images.unsplash.com/photo-1526772662000-3f88f10405ff?auto=format&fit=crop&w=1600&q=80",
+    coverImageUrl: "https://picsum.photos/seed/3/1600/900",
     tourTypeIds: ["culinary", "boutique"],
     highlights: ["Lantern making workshop", "Cham Islands snorkelling", "Private moonlit dinner"],
   },
@@ -85,7 +85,7 @@ export const tours: Tour[] = [
       "Trace Vietnam's imperial legacy with curated access to royal cuisine, court music, and riverside villas.",
     durationLabel: "7 days",
     priceFrom: 1240,
-    coverImageUrl: "https://images.unsplash.com/photo-1527258127-87e06c1f465e?auto=format&fit=crop&w=1600&q=80",
+    coverImageUrl: "https://picsum.photos/seed/4/1600/900",
     tourTypeIds: ["heritage"],
     highlights: ["Cyclo evening food crawl", "Private Hue garden house lunch", "Overnight Ha Long Bay cruise"],
   },
@@ -97,7 +97,7 @@ export const stories: Story[] = [
     title: "How We Curate Bespoke Wellness Retreats",
     excerpt:
       "Behind every misty sunrise session is a network of wellness experts, naturalists, and boutique hosts working in harmony.",
-    coverImageUrl: "https://images.unsplash.com/photo-1499696010181-8d8fdc76d1a5?auto=format&fit=crop&w=1200&q=80",
+    coverImageUrl: "https://picsum.photos/seed/5/1200/800",
     publishedAt: new Date("2024-07-12"),
     readTimeMinutes: 4,
   },
@@ -106,7 +106,7 @@ export const stories: Story[] = [
     title: "Five Dishes You Can Only Taste with Our Hosts",
     excerpt:
       "From royal banquets to fishermen's dawn harvests, explore the flavours travellers rave about after every trip.",
-    coverImageUrl: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=80",
+    coverImageUrl: "https://picsum.photos/seed/6/1200/800",
     publishedAt: new Date("2024-06-01"),
     readTimeMinutes: 5,
   },
@@ -115,7 +115,7 @@ export const stories: Story[] = [
     title: "Sustainable Partnerships Along The Coast",
     excerpt:
       "We team up with local communities to ensure each experience directly supports preservation and livelihoods.",
-    coverImageUrl: "https://images.unsplash.com/photo-1494475673543-6a6a27143fc8?auto=format&fit=crop&w=1200&q=80",
+    coverImageUrl: "https://picsum.photos/seed/7/1200/800",
     publishedAt: new Date("2024-05-10"),
     readTimeMinutes: 3,
   },
@@ -134,7 +134,7 @@ export const reviews: Review[] = [
     tourName: "Mist & Lanterns: Central Highlands Retreat",
     status: "approved",
     createdAt: new Date("2024-02-20"),
-    photoUrls: ["https://images.unsplash.com/photo-1473093226795-af9932fe5856?auto=format&fit=crop&w=600&q=80"],
+    photoUrls: ["https://picsum.photos/seed/8/600/800"],
     summary: "A flawless, restorative mountain escape highlighted by thoughtful wellness touches.",
   },
   {
@@ -175,7 +175,7 @@ export const reviews: Review[] = [
     tourName: "Mist & Lanterns: Central Highlands Retreat",
     status: "pending",
     createdAt: new Date("2024-04-21"),
-    photoUrls: ["https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=600&q=80"],
+    photoUrls: ["https://picsum.photos/seed/9/600/800"],
   },
   {
     id: "rev-5",
