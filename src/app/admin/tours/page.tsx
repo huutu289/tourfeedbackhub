@@ -47,13 +47,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore } from '@/firebase/provider';
+import { useFirestore, useUser } from '@/firebase/provider';
 import { collection, doc } from 'firebase/firestore';
 import { useCollection, type WithId } from '@/firebase/firestore/use-collection';
 import { useMemoFirebase } from '@/firebase/firestore/use-memo-firebase';
 import type { Tour } from '@/lib/types';
 import { setDocumentNonBlocking } from '@/firebase';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+
+const functionsBaseUrl = process.env.NEXT_PUBLIC_CLOUD_FUNCTIONS_BASE_URL;
 
 const tourSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -64,6 +65,38 @@ const tourSchema = z.object({
 });
 
 type TourFormValues = z.infer<typeof tourSchema>;
+
+async function getUploadUrl(
+  idToken: string,
+  fileName: string,
+  fileType: string
+): Promise<{ uploadUrl: string; publicUrl: string }> {
+  const res = await fetch(`${functionsBaseUrl}/admin-generate-upload-url`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${idToken}`,
+    },
+    body: JSON.stringify({ fileName, fileType }),
+  });
+  if (!res.ok) {
+    throw new Error('Failed to get upload URL');
+  }
+  return res.json();
+}
+
+async function uploadFile(
+  uploadUrl: string,
+  file: File
+): Promise<void> {
+  await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': file.type,
+    },
+    body: file,
+  });
+}
 
 function mapTour(doc: WithId<any>): Tour {
   return {
@@ -78,6 +111,7 @@ function mapTour(doc: WithId<any>): Tour {
 
 export default function AdminToursPage() {
   const firestore = useFirestore();
+  const { user } = useUser();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -129,19 +163,30 @@ export default function AdminToursPage() {
   };
 
   const onSubmit = async (values: TourFormValues) => {
+    if (!user) {
+      toast({
+        variant: 'destructive',
+        title: 'Authentication Error',
+        description: 'You must be logged in to perform this action.',
+      });
+      return;
+    }
+    
     setIsSubmitting(true);
     try {
+      const idToken = await user.getIdToken();
       const id = selectedTour ? selectedTour.id : doc(collection(firestore, 'tours')).id;
       const tourRef = doc(firestore, 'tours', id);
       
       let newMediaUrls: string[] = [];
 
       if (values.mediaFiles && values.mediaFiles.length > 0) {
-        const storage = getStorage();
         const uploadPromises = Array.from(values.mediaFiles as FileList).map(async (file: File) => {
-          const storageRef = ref(storage, `tours/${id}/${file.name}`);
-          const uploadResult = await uploadBytes(storageRef, file);
-          return getDownloadURL(uploadResult.ref);
+          // 1. Get signed URL
+          const { uploadUrl, publicUrl } = await getUploadUrl(idToken, `tours/${id}/${file.name}`, file.type);
+          // 2. Upload file to signed URL
+          await uploadFile(uploadUrl, file);
+          return publicUrl;
         });
         newMediaUrls = await Promise.all(uploadPromises);
       }
@@ -299,7 +344,7 @@ export default function AdminToursPage() {
               <FormField
                 control={form.control}
                 name="mediaFiles"
-                render={({ field: { onChange, value, ...rest } }) => (
+                render={({ field: { onChange, ...rest } }) => (
                   <FormItem>
                     <FormLabel>Media (Images/Videos)</FormLabel>
                      {selectedTour?.mediaUrls && (
@@ -310,7 +355,15 @@ export default function AdminToursPage() {
                        </div>
                     )}
                     <FormControl>
-                      <Input type="file" accept="image/*,video/*" multiple onChange={(e) => onChange(e.target.files)} {...rest} />
+                      <Input
+                        type="file"
+                        accept="image/*,video/*"
+                        multiple
+                        onChange={e => {
+                          onChange(e.target.files);
+                        }}
+                        {...rest}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
