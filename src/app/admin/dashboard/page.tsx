@@ -1,9 +1,6 @@
-import { reviews } from "@/lib/data";
 import FeedbackManager from "@/components/admin/feedback-manager";
 
 export default function AdminDashboard() {
-  const pendingFeedback = reviews.filter((r) => r.status === "pending");
-
   return (
     <div className="space-y-8">
       <div>
@@ -12,7 +9,7 @@ export default function AdminDashboard() {
           Review, approve, and manage user feedback.
         </p>
       </div>
-      <FeedbackManager initialFeedback={pendingFeedback} />
+      <FeedbackManager />
     </div>
   );
 }

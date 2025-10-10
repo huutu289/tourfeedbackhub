@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -24,8 +25,10 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { StarRating } from "@/components/star-rating";
-import { countries, languages, tours } from "@/lib/data";
-import { submitFeedback } from "@/lib/actions";
+import { countries, languages } from "@/lib/data";
+import type { Tour } from "@/lib/types";
+import { useRecaptchaEnterprise } from "@/hooks/use-recaptcha-enterprise";
+import { submitFeedbackToCloudFunctions } from "@/lib/cloud-functions-client";
 
 const feedbackFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -37,13 +40,31 @@ const feedbackFormSchema = z.object({
     .min(10, "Message must be at least 10 characters.")
     .max(1000, "Message must be 1000 characters or less."),
   tourId: z.string().optional(),
-  photo: z.any().optional(),
+  photo: z
+    .any()
+    .optional()
+    .refine((value) => {
+      if (!value || value.length === 0) return true;
+      const file: File = value[0];
+      return file.size <= 10 * 1024 * 1024;
+    }, "Photo must be smaller than 10MB."),
 });
 
 type FeedbackFormValues = z.infer<typeof feedbackFormSchema>;
 
-export default function FeedbackForm() {
+interface FeedbackFormProps {
+  tours: Pick<Tour, "id" | "name">[];
+}
+
+export default function FeedbackForm({ tours }: FeedbackFormProps) {
   const { toast } = useToast();
+  const { isReady: isRecaptchaReady, execute, error: recaptchaError } = useRecaptchaEnterprise({
+    action: "feedback_submit",
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const tourOptions = useMemo(() => tours.map((tour) => ({ id: tour.id, name: tour.name })), [tours]);
+
   const form = useForm<FeedbackFormValues>({
     resolver: zodResolver(feedbackFormSchema),
     defaultValues: {
@@ -57,37 +78,66 @@ export default function FeedbackForm() {
   });
 
   const onSubmit = async (data: FeedbackFormValues) => {
-    const formData = new FormData();
-    Object.entries(data).forEach(([key, value]) => {
-      if (key === 'photo') {
-        if (value && value.length > 0) {
-            formData.append(key, value[0]);
-        }
-      } else if (value !== undefined && value !== null) {
-        formData.append(key, String(value));
-      }
-    });
+    if (!isRecaptchaReady) {
+      toast({
+        title: "Spam protection not ready",
+        description: "Please wait a moment and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    const result = await submitFeedback(formData);
+    try {
+      setIsSubmitting(true);
+      const recaptchaToken = await execute();
+      const photoFile = data.photo && data.photo.length > 0 ? (data.photo[0] as File) : null;
 
-    if (result.success) {
+      await submitFeedbackToCloudFunctions(
+        {
+          name: data.name.trim(),
+          country: data.country,
+          language: data.language,
+          rating: data.rating,
+          message: data.message.trim(),
+          tourId: data.tourId ? data.tourId : undefined,
+          recaptchaToken,
+          hasAttachment: Boolean(photoFile),
+          attachmentMetadata: photoFile
+            ? {
+                fileName: photoFile.name,
+                contentType: photoFile.type,
+                size: photoFile.size,
+              }
+            : null,
+        },
+        photoFile
+      );
+
       toast({
         title: "Feedback Submitted!",
         description: "Thank you for sharing your experience with us.",
       });
       form.reset();
-    } else {
+    } catch (error) {
+      console.error("Feedback submission error:", error);
       toast({
         title: "Submission Failed",
-        description: result.error,
+        description: error instanceof Error ? error.message : "An unexpected error occurred.",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        {recaptchaError && (
+          <p className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            {recaptchaError.message}
+          </p>
+        )}
         <div className="grid md:grid-cols-2 gap-8">
           <FormField
             control={form.control}
@@ -108,10 +158,7 @@ export default function FeedbackForm() {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Country</FormLabel>
-                <Select
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                >
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select your country" />
@@ -138,10 +185,7 @@ export default function FeedbackForm() {
             <FormItem>
               <FormLabel>Overall Rating</FormLabel>
               <FormControl>
-                <StarRating
-                  rating={field.value}
-                  setRating={(value) => field.onChange(value)}
-                />
+                <StarRating rating={field.value} setRating={(value) => field.onChange(value)} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -149,60 +193,54 @@ export default function FeedbackForm() {
         />
 
         <div className="grid md:grid-cols-2 gap-8">
-            <FormField
+          <FormField
             control={form.control}
             name="tourId"
             render={({ field }) => (
-                <FormItem>
+              <FormItem>
                 <FormLabel>Which tour did you take? (Optional)</FormLabel>
-                <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                >
-                    <FormControl>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
                     <SelectTrigger>
-                        <SelectValue placeholder="Select a tour" />
+                      <SelectValue placeholder="Select a tour" />
                     </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                    {tours.map((tour) => (
-                        <SelectItem key={tour.id} value={tour.id}>
+                  </FormControl>
+                  <SelectContent>
+                    {tourOptions.map((tour) => (
+                      <SelectItem key={tour.id} value={tour.id}>
                         {tour.name}
-                        </SelectItem>
+                      </SelectItem>
                     ))}
-                    </SelectContent>
+                  </SelectContent>
                 </Select>
                 <FormMessage />
-                </FormItem>
+              </FormItem>
             )}
-            />
-            <FormField
+          />
+          <FormField
             control={form.control}
             name="language"
             render={({ field }) => (
-                <FormItem>
+              <FormItem>
                 <FormLabel>Language</FormLabel>
-                <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                >
-                    <FormControl>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
                     <SelectTrigger>
-                        <SelectValue placeholder="Select your language" />
+                      <SelectValue placeholder="Select your language" />
                     </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
+                  </FormControl>
+                  <SelectContent>
                     {languages.map((lang) => (
-                        <SelectItem key={lang.code} value={lang.code}>
+                      <SelectItem key={lang.code} value={lang.code}>
                         {lang.name}
-                        </SelectItem>
+                      </SelectItem>
                     ))}
-                    </SelectContent>
+                  </SelectContent>
                 </Select>
                 <FormMessage />
-                </FormItem>
+              </FormItem>
             )}
-            />
+          />
         </div>
 
         <FormField
@@ -224,9 +262,9 @@ export default function FeedbackForm() {
         />
 
         <FormField
-            control={form.control}
-            name="photo"
-            render={({ field: { onChange, value, ...rest } }) => (
+          control={form.control}
+          name="photo"
+          render={({ field: { onChange, ...rest } }) => (
             <FormItem>
               <FormLabel>Add a photo (optional)</FormLabel>
               <FormControl>
@@ -237,9 +275,8 @@ export default function FeedbackForm() {
           )}
         />
 
-
-        <Button type="submit" size="lg" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        <Button type="submit" size="lg" disabled={isSubmitting || !isRecaptchaReady}>
+          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Submit Feedback
         </Button>
       </form>

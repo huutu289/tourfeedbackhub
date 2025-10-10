@@ -1,11 +1,12 @@
-import { reviews } from '@/lib/data';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Star } from 'lucide-react';
 import { format } from 'date-fns';
+import { getPublicContent } from '@/lib/content-service';
 
-export default function ApprovedReviewsPage() {
+export default async function ApprovedReviewsPage() {
+  const { reviews } = await getPublicContent();
   const approvedReviews = reviews.filter((r) => r.status === 'approved');
 
   return (
@@ -24,11 +25,11 @@ export default function ApprovedReviewsPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <Avatar>
-                    <AvatarImage src={`https://i.pravatar.cc/150?u=${review.name}`} />
-                    <AvatarFallback>{review.name.charAt(0)}</AvatarFallback>
+                    <AvatarImage src={`https://i.pravatar.cc/150?u=${review.authorDisplay}`} />
+                    <AvatarFallback>{review.authorDisplay.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <CardTitle className="text-base font-body font-bold">{review.name}</CardTitle>
+                    <CardTitle className="text-base font-body font-bold">{review.authorDisplay}</CardTitle>
                     <CardDescription className="text-xs">{review.country}</CardDescription>
                   </div>
                 </div>
@@ -43,7 +44,7 @@ export default function ApprovedReviewsPage() {
               <p>&quot;{review.message}&quot;</p>
             </CardContent>
             <CardFooter className="flex justify-between items-center text-xs text-muted-foreground">
-              <Badge variant="outline">{review.tourName}</Badge>
+              {review.tourName && <Badge variant="outline">{review.tourName}</Badge>}
               <span>{format(review.createdAt, 'MMM d, yyyy')}</span>
             </CardFooter>
           </Card>

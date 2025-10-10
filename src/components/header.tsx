@@ -10,8 +10,12 @@ import {
 
 const navLinks = [
   { href: "/", label: "Home" },
+  { href: "/about", label: "About" },
+  { href: "/tour-types", label: "Tour Types" },
+  { href: "/tours", label: "Tours" },
+  { href: "/stories", label: "Stories" },
   { href: "/reviews", label: "Reviews" },
-  { href: "/feedback", label: "Leave Feedback" },
+  { href: "/contact", label: "Contact" },
 ];
 
 export default function Header() {

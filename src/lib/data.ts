@@ -1,93 +1,194 @@
-import { type Tour, type Review } from "@/lib/types";
+import { type Tour, type Review, type SiteSettings, type TourType, type Story } from "@/lib/types";
+
+export const siteSettings: SiteSettings = {
+  heroTitle: "Share Your Journey, Shape Ours",
+  heroSubtitle:
+    "Your honest reflections help us refine every itinerary and craft unforgettable moments for future travellers.",
+  heroCtaLabel: "Leave a Review",
+  heroMediaUrl: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=80",
+  aboutTitle: "Guiding Boutique Adventures Across Vietnam",
+  aboutDescription:
+    "I am Trang, your private tour designer. From hidden mountain retreats to coastal culinary escapes, I curate bespoke experiences grounded in local expertise and heartfelt hospitality.",
+  missionStatement:
+    "Deliver deeply personal journeys that celebrate culture, comfort, and connection.",
+  values: [
+    "Authentic local partnerships",
+    "Sustainable travel choices",
+    "Tailored, small-group attention",
+  ],
+  contact: {
+    email: "hello@tourfeedbackhub.com",
+    phone: "+84 912 345 678",
+    whatsapp: "https://wa.me/84912345678",
+    facebook: "https://facebook.com/tourfeedbackhub",
+    instagram: "https://instagram.com/tourfeedbackhub",
+    zalo: "https://zalo.me/0912345678",
+    location: "Da Nang, Vietnam",
+  },
+  languages: ["en", "it"],
+  defaultLanguage: "en",
+  primaryColor: "#77B5FE",
+  accentColor: "#4682B4",
+};
+
+export const tourTypes: TourType[] = [
+  {
+    id: "boutique",
+    title: "Boutique Experiences",
+    description: "Handpicked accommodations and intimate itineraries with refined touches throughout.",
+    icon: "hotel",
+    order: 1,
+  },
+  {
+    id: "culinary",
+    title: "Culinary Journeys",
+    description: "Explore vibrant markets, master local dishes, and dine with trusted hosts.",
+    icon: "utensils",
+    order: 2,
+  },
+  {
+    id: "heritage",
+    title: "Heritage Trails",
+    description: "Walk through UNESCO sites and untold stories guided by local historians.",
+    icon: "landmark",
+    order: 3,
+  },
+];
 
 export const tours: Tour[] = [
   {
     id: "tour-1",
-    name: "Mystical Mountain Escape",
-    description: "Journey through serene mountain landscapes and ancient forests. A true escape to nature's tranquility.",
-    price: 499,
-    duration: "5 Days",
-    imageId: "tour-mountain"
+    name: "Mist & Lanterns: Central Highlands Retreat",
+    summary:
+      "A five-day escape through Da Lat's pine forests and cozy tea houses, blending wellness, coffee culture, and artisan workshops.",
+    durationLabel: "5 days",
+    priceFrom: 890,
+    coverImageUrl: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=80",
+    tourTypeIds: ["boutique", "heritage"],
+    highlights: ["Private hydrotherapy session", "Sunrise forest hike", "Chef-led farm-to-table dinner"],
   },
   {
     id: "tour-2",
-    name: "Coastal Wonders Expedition",
-    description: "Explore dramatic coastlines, hidden beaches, and charming seaside villages. Perfect for ocean lovers.",
-    price: 699,
-    duration: "7 Days",
-    imageId: "tour-coastal"
+    name: "Coastal Reverie: Hoi An & The Cham Islands",
+    summary:
+      "Sail translucent waters, savour coastal cuisine, and reconnect with artisans preserving ancient lantern craft.",
+    durationLabel: "4 days",
+    priceFrom: 760,
+    coverImageUrl: "https://images.unsplash.com/photo-1526772662000-3f88f10405ff?auto=format&fit=crop&w=1600&q=80",
+    tourTypeIds: ["culinary", "boutique"],
+    highlights: ["Lantern making workshop", "Cham Islands snorkelling", "Private moonlit dinner"],
   },
   {
     id: "tour-3",
-    name: "Vibrant City Lights",
-    description: "Immerse yourself in the bustling energy of the city, from iconic landmarks to hidden local gems.",
-    price: 350,
-    duration: "3 Days",
-    imageId: "tour-city"
+    name: "Heritage Symphony: Hue to Hanoi",
+    summary:
+      "Trace Vietnam's imperial legacy with curated access to royal cuisine, court music, and riverside villas.",
+    durationLabel: "7 days",
+    priceFrom: 1240,
+    coverImageUrl: "https://images.unsplash.com/photo-1527258127-87e06c1f465e?auto=format&fit=crop&w=1600&q=80",
+    tourTypeIds: ["heritage"],
+    highlights: ["Cyclo evening food crawl", "Private Hue garden house lunch", "Overnight Ha Long Bay cruise"],
+  },
+];
+
+export const stories: Story[] = [
+  {
+    id: "story-1",
+    title: "How We Curate Bespoke Wellness Retreats",
+    excerpt:
+      "Behind every misty sunrise session is a network of wellness experts, naturalists, and boutique hosts working in harmony.",
+    coverImageUrl: "https://images.unsplash.com/photo-1499696010181-8d8fdc76d1a5?auto=format&fit=crop&w=1200&q=80",
+    publishedAt: new Date("2024-07-12"),
+    readTimeMinutes: 4,
+  },
+  {
+    id: "story-2",
+    title: "Five Dishes You Can Only Taste with Our Hosts",
+    excerpt:
+      "From royal banquets to fishermen's dawn harvests, explore the flavours travellers rave about after every trip.",
+    coverImageUrl: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=80",
+    publishedAt: new Date("2024-06-01"),
+    readTimeMinutes: 5,
+  },
+  {
+    id: "story-3",
+    title: "Sustainable Partnerships Along The Coast",
+    excerpt:
+      "We team up with local communities to ensure each experience directly supports preservation and livelihoods.",
+    coverImageUrl: "https://images.unsplash.com/photo-1494475673543-6a6a27143fc8?auto=format&fit=crop&w=1200&q=80",
+    publishedAt: new Date("2024-05-10"),
+    readTimeMinutes: 3,
   },
 ];
 
 export const reviews: Review[] = [
   {
     id: "rev-1",
-    name: "Alex Johnson",
+    authorDisplay: "Alex Johnson",
     country: "USA",
     language: "en",
     rating: 5,
-    message: "The Mountain Escape was absolutely breathtaking! Every detail was perfectly organized. The views were surreal and our guide was fantastic. Highly recommend!",
+    message:
+      "The Mist & Lanterns retreat exceeded every expectation. Trang curated moments I didn't know I needed—especially the silent tea ceremony at dawn.",
     tourId: "tour-1",
-    tourName: "Mystical Mountain Escape",
+    tourName: "Mist & Lanterns: Central Highlands Retreat",
     status: "approved",
-    createdAt: new Date("2023-10-20"),
+    createdAt: new Date("2024-02-20"),
+    photoUrls: ["https://images.unsplash.com/photo-1473093226795-af9932fe5856?auto=format&fit=crop&w=600&q=80"],
+    summary: "A flawless, restorative mountain escape highlighted by thoughtful wellness touches.",
   },
   {
     id: "rev-2",
-    name: "Maria Garcia",
+    authorDisplay: "Maria Garcia",
     country: "Spain",
     language: "es",
-    message: "Una experiencia inolvidable en la costa. Los paisajes son de ensueño y la comida local deliciosa. El hotel podría haber sido un poco mejor, pero en general, ¡excelente!",
     rating: 4,
+    message:
+      "El viaje a las islas Cham fue mágico. Solo recomendaría un día extra para explorar más la gastronomía local. ¡La cena privada fue inolvidable!",
     tourId: "tour-2",
-    tourName: "Coastal Wonders Expedition",
+    tourName: "Coastal Reverie: Hoi An & The Cham Islands",
     status: "approved",
-    createdAt: new Date("2023-11-05"),
+    createdAt: new Date("2024-03-15"),
   },
   {
     id: "rev-3",
-    name: "Kenji Tanaka",
+    authorDisplay: "Kenji Tanaka",
     country: "Japan",
     language: "ja",
     rating: 5,
-    message: "City Lights tour was a fantastic way to see the city. Our guide showed us so many places we would have never found on our own. It was fast-paced but so much fun.",
+    message:
+      "Hue からハノイまでの旅は、歴史が生きているような感覚でした。伝統音楽のプライベート公演は一生忘れません。",
     tourId: "tour-3",
-    tourName: "Vibrant City Lights",
+    tourName: "Heritage Symphony: Hue to Hanoi",
     status: "approved",
-    createdAt: new Date("2023-11-15"),
+    createdAt: new Date("2024-04-02"),
   },
-   {
+  {
     id: "rev-4",
-    name: "Chloe Dubois",
+    authorDisplay: "Chloe Dubois",
     country: "France",
     language: "fr",
     rating: 3,
-    message: "Le tour des montagnes était bien, mais il a plu presque tous les jours, ce qui a un peu gâché l'expérience. L'organisation était bonne cependant.",
+    message:
+      "Les paysages étaient magnifiques mais la météo capricieuse. Trang a tout de même trouvé des alternatives très appréciées.",
     tourId: "tour-1",
-    tourName: "Mystical Mountain Escape",
+    tourName: "Mist & Lanterns: Central Highlands Retreat",
     status: "pending",
-    createdAt: new Date("2023-12-01"),
-    photoUrl: "https://picsum.photos/seed/101/400/300"
+    createdAt: new Date("2024-04-21"),
+    photoUrls: ["https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=600&q=80"],
   },
-   {
+  {
     id: "rev-5",
-    name: "Ben Carter",
+    authorDisplay: "Ben Carter",
     country: "Australia",
     language: "en",
     rating: 5,
-    message: "Did the coastal tour and it was epic! The views were insane and our group was a lot of fun. The accommodation was top-notch too. 10/10 would do it again.",
+    message:
+      "From snorkelling with our private marine guide to the lantern release, every detail felt curated with intention.",
     tourId: "tour-2",
-    tourName: "Coastal Wonders Expedition",
+    tourName: "Coastal Reverie: Hoi An & The Cham Islands",
     status: "pending",
-    createdAt: new Date("2023-12-02"),
+    createdAt: new Date("2024-04-24"),
   },
 ];
 
