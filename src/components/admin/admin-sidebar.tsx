@@ -9,6 +9,7 @@ import {
   Settings,
   Star,
   LogOut,
+  BookText,
 } from "lucide-react";
 
 import {
@@ -38,6 +39,12 @@ const menuItems = [
     icon: Map,
     label: "Tours",
     tooltip: "Manage Tours",
+  },
+  {
+    href: "/admin/stories",
+    icon: BookText,
+    label: "Stories",
+    tooltip: "Manage Stories",
   },
   {
     href: "/admin/reviews",
