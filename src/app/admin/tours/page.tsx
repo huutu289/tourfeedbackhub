@@ -2,6 +2,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Image from 'next/image';
 import {
   Table,
   TableBody,
@@ -53,6 +54,7 @@ import { useCollection, type WithId } from '@/firebase/firestore/use-collection'
 import { useMemoFirebase } from '@/firebase/firestore/use-memo-firebase';
 import type { Tour } from '@/lib/types';
 import { setDocumentNonBlocking } from '@/firebase';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 // Schema for the tour form
 const tourSchema = z.object({
@@ -60,7 +62,7 @@ const tourSchema = z.object({
   summary: z.string().min(1, 'Summary is required'),
   durationLabel: z.string().min(1, 'Duration is required'),
   priceFrom: z.coerce.number().min(0, 'Price must be a positive number'),
-  coverImageUrl: z.string().url('Must be a valid URL').optional().or(z.literal('')),
+  coverImage: z.any().optional(),
 });
 
 type TourFormValues = z.infer<typeof tourSchema>;
@@ -101,7 +103,7 @@ export default function AdminToursPage() {
       summary: '',
       durationLabel: '',
       priceFrom: 0,
-      coverImageUrl: '',
+      coverImage: null,
     },
   });
 
@@ -112,14 +114,20 @@ export default function AdminToursPage() {
       summary: tour.summary,
       durationLabel: tour.durationLabel,
       priceFrom: tour.priceFrom,
-      coverImageUrl: tour.coverImageUrl,
+      coverImage: tour.coverImageUrl,
     });
     setIsDialogOpen(true);
   };
 
   const handleAddNew = () => {
     setSelectedTour(null);
-    form.reset();
+    form.reset({
+      name: '',
+      summary: '',
+      durationLabel: '',
+      priceFrom: 0,
+      coverImage: null,
+    });
     setIsDialogOpen(true);
   };
 
@@ -129,8 +137,23 @@ export default function AdminToursPage() {
       const id = selectedTour ? selectedTour.id : doc(collection(firestore, 'tours')).id;
       const tourRef = doc(firestore, 'tours', id);
       
+      let coverImageUrl = selectedTour?.coverImageUrl || '';
+
+      // Check if a new file is uploaded
+      if (values.coverImage && values.coverImage[0] instanceof File) {
+        const file = values.coverImage[0] as File;
+        const storage = getStorage();
+        const storageRef = ref(storage, `tours/${id}/${file.name}`);
+        const uploadResult = await uploadBytes(storageRef, file);
+        coverImageUrl = await getDownloadURL(uploadResult.ref);
+      }
+
       const tourData = {
-        ...values,
+        name: values.name,
+        summary: values.summary,
+        durationLabel: values.durationLabel,
+        priceFrom: values.priceFrom,
+        coverImageUrl,
         id,
       };
 
@@ -142,6 +165,7 @@ export default function AdminToursPage() {
       });
       setIsDialogOpen(false);
     } catch (error) {
+      console.error("Error saving tour:", error);
       toast({
         variant: 'destructive',
         title: 'Save Failed',
@@ -151,6 +175,8 @@ export default function AdminToursPage() {
       setIsSubmitting(false);
     }
   };
+
+  const currentCoverImage = form.watch('coverImage');
 
   return (
     <>
@@ -276,12 +302,17 @@ export default function AdminToursPage() {
               />
               <FormField
                 control={form.control}
-                name="coverImageUrl"
-                render={({ field }) => (
+                name="coverImage"
+                render={({ field: { onChange, value, ...rest } }) => (
                   <FormItem>
-                    <FormLabel>Cover Image URL</FormLabel>
+                    <FormLabel>Cover Image</FormLabel>
+                    {selectedTour?.coverImageUrl && typeof currentCoverImage === 'string' && (
+                       <div className="mt-2">
+                         <Image src={currentCoverImage} alt="Current cover image" width={120} height={90} className="rounded-md object-cover" />
+                       </div>
+                    )}
                     <FormControl>
-                      <Input {...field} placeholder="https://..." />
+                      <Input type="file" accept="image/*" onChange={(e) => onChange(e.target.files)} {...rest} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
