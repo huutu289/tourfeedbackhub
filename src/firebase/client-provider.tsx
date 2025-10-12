@@ -16,7 +16,13 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
   }, []); // Empty dependency array ensures this runs only once on mount
 
   useEffect(() => {
-    ensureAppCheck(firebaseServices.firebaseApp);
+    const appCheck = ensureAppCheck(firebaseServices.firebaseApp);
+
+    if (appCheck) {
+      console.log('✓ App Check initialized successfully');
+    } else {
+      console.warn('✗ App Check failed to initialize');
+    }
   }, [firebaseServices.firebaseApp]);
 
   return (

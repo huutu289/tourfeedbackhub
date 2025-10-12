@@ -48,13 +48,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser } from '@/firebase/provider';
-import { collection, doc } from 'firebase/firestore';
+import { collection, doc, setDoc } from 'firebase/firestore';
 import { useCollection, type WithId } from '@/firebase/firestore/use-collection';
 import { useMemoFirebase } from '@/firebase/firestore/use-memo-firebase';
 import type { Tour } from '@/lib/types';
-import { setDocumentNonBlocking } from '@/firebase';
-
-const functionsBaseUrl = process.env.NEXT_PUBLIC_CLOUD_FUNCTIONS_BASE_URL;
+import { uploadTourMedia } from '@/lib/cloud-functions-client';
 
 const tourSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -64,47 +62,6 @@ const tourSchema = z.object({
 });
 
 type TourFormValues = z.infer<typeof tourSchema>;
-
-async function getUploadUrl(
-  idToken: string,
-  fileName: string,
-  fileType: string
-): Promise<{ uploadUrl: string; publicUrl: string }> {
-  if (!functionsBaseUrl) {
-    throw new Error('Cloud Functions base URL is not configured.');
-  }
-  const res = await fetch(`${functionsBaseUrl}/adminGenerateUploadUrl`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${idToken}`,
-    },
-    body: JSON.stringify({ fileName, fileType }),
-  });
-  if (!res.ok) {
-    const errorBody = await res.text();
-    console.error('Failed to get upload URL:', errorBody);
-    throw new Error(`Failed to get upload URL: ${res.statusText}`);
-  }
-  const data = await res.json();
-  if (!data.success) {
-    throw new Error(data.error?.message || 'Failed to get upload URL from function.');
-  }
-  return data;
-}
-
-async function uploadFile(
-  uploadUrl: string,
-  file: File
-): Promise<void> {
-  await fetch(uploadUrl, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': file.type,
-    },
-    body: file,
-  });
-}
 
 function mapTour(doc: WithId<any>): WithId<Tour> {
   return {
@@ -181,18 +138,26 @@ export default function AdminToursPage() {
     
     setIsSubmitting(true);
     try {
-      const idToken = await user.getIdToken();
+      // Check App Check status
+      const { getAppCheckToken } = await import('@/firebase/app-check');
+      const appCheckToken = await getAppCheckToken();
+      console.log('App Check Token:', appCheckToken ? 'Present ✓' : 'Missing ✗');
+      console.log('Token value (first 20 chars):', appCheckToken ? appCheckToken.substring(0, 20) + '...' : 'NULL');
+
+      if (!appCheckToken) {
+        console.error('App Check token is null! This will cause permission-denied errors.');
+        throw new Error('App Check token is missing. Please refresh the page and ensure App Check is properly configured.');
+      }
+
       const id = selectedTour ? selectedTour.id : doc(collection(firestore, 'tours')).id;
       const tourRef = doc(firestore, 'tours', id);
-      
+
       let newMediaUrls: string[] = [];
       const mediaFiles = mediaFileInputRef.current?.files;
 
       if (mediaFiles && mediaFiles.length > 0) {
         const uploadPromises = Array.from(mediaFiles).map(async (file: File) => {
-          const { uploadUrl, publicUrl } = await getUploadUrl(idToken, `tours/${id}/${file.name}`, file.type);
-          await uploadFile(uploadUrl, file);
-          return publicUrl;
+          return await uploadTourMedia(id, file);
         });
         newMediaUrls = await Promise.all(uploadPromises);
       }
@@ -206,7 +171,17 @@ export default function AdminToursPage() {
         id,
       };
 
-      setDocumentNonBlocking(tourRef, tourData, { merge: true });
+      // CHANGED: Use setDoc directly and await it to catch errors
+      console.log('Saving tour data:', tourData);
+      console.log('Tour document path:', tourRef.path);
+
+      try {
+        await setDoc(tourRef, tourData, { merge: true });
+        console.log('✓ Tour saved successfully to Firestore!');
+      } catch (firestoreError) {
+        console.error('Firestore setDoc error:', firestoreError);
+        throw firestoreError; // Re-throw to be caught by outer catch
+      }
 
       toast({
         title: selectedTour ? 'Tour Updated' : 'Tour Created',
@@ -215,10 +190,42 @@ export default function AdminToursPage() {
       setIsDialogOpen(false);
     } catch (error) {
       console.error("Error saving tour:", error);
+      let description = 'An unexpected error occurred.';
+      let title = 'Save Failed';
+      const anyErr = error as any;
+      const code: string | undefined = anyErr?.code;
+      const msg: string | undefined = anyErr?.message;
+
+      // Add more detailed error logging
+      console.error('Error details:', {
+        code,
+        message: msg,
+        fullError: error
+      });
+
+      if (code === 'permission-denied') {
+        title = 'Permission Denied';
+        description = 'App Check token missing or invalid. Check browser console for debug token.';
+      } else if (code === 'app_check_failed') {
+        title = 'App Check Failed';
+        description = 'Please refresh the page. Ensure App Check is configured.';
+      } else if (code === 'forbidden') {
+        title = 'Admin Access Required';
+        description = 'Your account lacks admin privileges. Sign in with an admin account.';
+      } else if (code === 'invalid_file') {
+        title = 'Invalid File';
+        description = msg ?? 'File type/size not allowed.';
+      } else if (code === 'sign_url_failed') {
+        title = 'Upload URL Error';
+        description = 'Could not create signed URL. Try again or contact support.';
+      } else if (msg) {
+        description = msg;
+      }
+
       toast({
         variant: 'destructive',
-        title: 'Save Failed',
-        description: error instanceof Error ? error.message : 'An unexpected error occurred.',
+        title,
+        description,
       });
     } finally {
       setIsSubmitting(false);

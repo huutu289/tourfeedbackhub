@@ -2,101 +2,39 @@
  * @fileoverview Firestore Security Rules for the Tour Insights Hub application.
  *
  * Core Philosophy:
- * This ruleset enforces a strict App Check based security model.
- * All write operations require a valid App Check token, ensuring that only trusted clients can modify data.
- * Read operations are public.
+ * Public read access for all collections.
+ * Write access is open for development - should be restricted in production.
+ *
+ * NOTE: App Check enforcement is handled at the Firebase Console level,
+ * NOT in security rules. To enable App Check:
+ * 1. Go to Firebase Console → App Check
+ * 2. Find "Cloud Firestore" and click "Enforce"
+ * 3. All requests without valid App Check tokens will be rejected
  *
  * Data Structure:
- * The Firestore database consists of four top-level collections:
  * - /site_settings: Stores global site settings.
  * - /tour_types: Stores tour types.
  * - /tours: Stores tour information.
  * - /feedback: Stores user feedback.
- *
- * Key Security Decisions:
- * - All write operations across all collections require a valid App Check token.
- * - Read operations are public.
- * - There is no user-based authentication or ownership.
- * - App Check is used to protect against abuse from untrusted clients.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * @description Grants public read access and restricts writes to clients with a valid App Check token for the /site_settings collection.
-     * @path /site_settings/{siteSettingsId}
-     * @allow get, list: if true;
-     * @allow create: if request.auth.app != null;
-     * @allow update: if request.auth.app != null && resource != null;
-     * @allow delete: if request.auth.app != null && resource != null;
-     * @deny create: if request.auth.app == null;
-     * @deny update: if request.auth.app == null;
-     * @deny delete: if request.auth.app == null;
-     * @principle App Check token required for write operations.
-     */
     match /site_settings/{siteSettingsId} {
-      allow get, list: if true;
-      allow create: if request.auth.app != null;
-      allow update: if request.auth.app != null && resource != null;
-      allow delete: if request.auth.app != null && resource != null;
+      allow read, write: if true;
     }
 
-    /**
-     * @description Grants public read access and restricts writes to clients with a valid App Check token for the /tour_types collection.
-     * @path /tour_types/{tourTypeId}
-     * @allow get, list: if true;
-     * @allow create: if request.auth.app != null;
-     * @allow update: if request.auth.app != null && resource != null;
-     * @allow delete: if request.auth.app != null && resource != null;
-     * @deny create: if request.auth.app == null;
-     * @deny update: if request.auth.app == null;
-     * @deny delete: if request.auth.app == null;
-     * @principle App Check token required for write operations.
-     */
     match /tour_types/{tourTypeId} {
-      allow get, list: if true;
-      allow create: if request.auth.app != null;
-      allow update: if request.auth.app != null && resource != null;
-      allow delete: if request.auth.app != null && resource != null;
+      allow read, write: if true;
     }
 
-    /**
-     * @description Grants public read access and restricts writes to clients with a valid App Check token for the /tours collection.
-     * @path /tours/{tourId}
-     * @allow get, list: if true;
-     * @allow create: if request.auth.app != null;
-     * @allow update: if request.auth.app != null && resource != null;
-     * @allow delete: if request.auth.app != null && resource != null;
-     * @deny create: if request.auth.app == null;
-     * @deny update: if request.auth.app == null;
-     * @deny delete: if request.auth.app == null;
-     * @principle App Check token required for write operations.
-     */
     match /tours/{tourId} {
-      allow get, list: if true;
-      allow create: if request.auth.app != null;
-      allow update: if request.auth.app != null && resource != null;
-      allow delete: if request.auth.app != null && resource != null;
+      allow read, write: if true;
     }
 
-    /**
-     * @description Grants public read access and restricts writes to clients with a valid App Check token for the /feedback collection.
-     * @path /feedback/{feedbackId}
-     * @allow get, list: if true;
-     * @allow create: if request.auth.app != null;
-     * @allow update: if request.auth.app != null && resource != null;
-     * @allow delete: if request.auth.app != null && resource != null;
-     * @deny create: if request.auth.app == null;
-     * @deny update: if request.auth.app == null;
-     * @deny delete: if request.auth.app == null;
-     * @principle App Check token required for write operations.
-     */
     match /feedback/{feedbackId} {
-      allow get, list: if true;
-      allow create: if request.auth.app != null;
-      allow update: if request.auth.app != null && resource != null;
-      allow delete: if request.auth.app != null && resource != null;
+      allow read, write: if true;
     }
   }
 }

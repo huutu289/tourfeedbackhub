@@ -1,6 +1,6 @@
 "use client";
 
-import { initializeAppCheck, ReCaptchaEnterpriseProvider, getToken, type AppCheck } from "firebase/app-check";
+import { initializeAppCheck, ReCaptchaV3Provider, getToken, type AppCheck } from "firebase/app-check";
 import type { FirebaseApp } from "firebase/app";
 
 let appCheckInstance: AppCheck | null = null;
@@ -18,6 +18,13 @@ export function ensureAppCheck(firebaseApp: FirebaseApp): AppCheck | null {
     return appCheckInstance;
   }
 
+  // Optional: enable App Check debug token via env flag.
+  // Set NEXT_PUBLIC_APPCHECK_DEBUG=1 in .env.local to use debug tokens locally.
+  if (process.env.NEXT_PUBLIC_APPCHECK_DEBUG === "1") {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+  }
+
   const siteKey = process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_KEY;
 
   if (!siteKey) {
@@ -29,8 +36,9 @@ export function ensureAppCheck(firebaseApp: FirebaseApp): AppCheck | null {
   }
 
   try {
+    // IMPORTANT: Using reCAPTCHA v3 provider to match Console configuration
     appCheckInstance = initializeAppCheck(firebaseApp, {
-      provider: new ReCaptchaEnterpriseProvider(siteKey),
+      provider: new ReCaptchaV3Provider(siteKey),
       isTokenAutoRefreshEnabled: true,
     });
     initializationAttempted = true;

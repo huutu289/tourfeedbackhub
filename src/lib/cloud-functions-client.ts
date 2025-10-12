@@ -61,6 +61,18 @@ async function withAppCheckHeaders(headers: HeadersInit = {}): Promise<HeadersIn
   };
 }
 
+async function getIdToken(): Promise<string | null> {
+  try {
+    const { getAuth } = await import('firebase/auth');
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) return null;
+    return await user.getIdToken();
+  } catch (e) {
+    return null;
+  }
+}
+
 async function callFunction(path: string, body: unknown, additionalHeaders: HeadersInit = {}) {
   const baseUrl = getFunctionsBaseUrl();
   const headersWithAppCheck = await withAppCheckHeaders({ ...DEFAULT_HEADERS, ...additionalHeaders });
@@ -73,7 +85,20 @@ async function callFunction(path: string, body: unknown, additionalHeaders: Head
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || `Cloud Function ${path} returned ${response.status}`);
+    let errMsg = `Cloud Function ${path} returned ${response.status}`;
+    let errCode: string | undefined;
+    try {
+      const parsed = JSON.parse(text);
+      errCode = parsed?.error?.code;
+      errMsg = parsed?.error?.message || errMsg;
+    } catch (_) {
+      if (text) errMsg = text;
+    }
+    const err: any = new Error(errMsg);
+    if (errCode) err.code = errCode;
+    (err as any).status = response.status;
+    (err as any).raw = text;
+    throw err;
   }
 
   return response.json();
@@ -99,7 +124,7 @@ async function uploadAttachment(upload: UploadDetails, file: File) {
 }
 
 export async function submitFeedbackToCloudFunctions(payload: FeedbackSubmitPayload, photo?: File | null) {
-  const response = (await callFunction("feedback-submit", payload, {
+  const response = (await callFunction("feedbackSubmit", payload, {
     "X-Recaptcha-Token": payload.recaptchaToken,
   })) as FeedbackSubmitResponse;
 
@@ -110,7 +135,7 @@ export async function submitFeedbackToCloudFunctions(payload: FeedbackSubmitPayl
 
   if (photo && response.uploadDetails) {
     await uploadAttachment(response.uploadDetails, photo);
-    await callFunction("feedback-upload-complete", {
+    await callFunction("feedbackUploadComplete", {
       feedbackId: response.feedbackId,
       uploadId: response.uploadDetails.uploadId,
     });
@@ -120,11 +145,44 @@ export async function submitFeedbackToCloudFunctions(payload: FeedbackSubmitPayl
 }
 
 export async function approveFeedback(feedbackId: string) {
-  await callFunction("admin-feedback-approve", { feedbackId });
+  await callFunction("adminFeedbackApprove", { feedbackId });
 }
 
 export async function rejectFeedback(feedbackId: string) {
-  await callFunction("admin-feedback-reject", { feedbackId });
+  await callFunction("adminFeedbackReject", { feedbackId });
+}
+
+// Admin: get signed upload URL for tour media, upload file, return download URL
+export async function uploadTourMedia(tourId: string, file: File): Promise<string> {
+  const idToken = await getIdToken();
+  if (!idToken) throw new Error('Not authenticated');
+
+  const payload = {
+    tourId,
+    fileName: file.name,
+    contentType: file.type,
+    size: file.size,
+  };
+
+  const resp = await callFunction(
+    'adminTourUploadUrl',
+    payload,
+    { Authorization: `Bearer ${idToken}` }
+  );
+
+  const { success, uploadDetails, downloadUrl, error } = resp as {
+    success: boolean;
+    uploadDetails: UploadDetails;
+    downloadUrl: string;
+    error?: CloudFunctionError;
+  };
+
+  if (!success || !uploadDetails) {
+    throw new Error(error?.message || 'Failed to get upload URL');
+  }
+
+  await uploadAttachment(uploadDetails, file);
+  return downloadUrl;
 }
 
 export type ClientReview = Pick<Review, "id" | "authorDisplay" | "country" | "language" | "rating" | "message" | "tourId" | "tourName" | "photoUrls" | "createdAt" | "summary">;
