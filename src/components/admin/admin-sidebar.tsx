@@ -18,6 +18,7 @@ import {
   Flag,
   Navigation,
   LayoutTemplate,
+  Images,
 } from "lucide-react";
 
 import {
@@ -59,6 +60,12 @@ const menuItems = [
     icon: LayoutTemplate,
     label: "Footer Nav",
     tooltip: "Manage footer navigation",
+  },
+  {
+    href: "/admin/slide-bar",
+    icon: Images,
+    label: "Slide Bar",
+    tooltip: "Manage hero slides",
   },
   {
     href: "/admin/tour-types",

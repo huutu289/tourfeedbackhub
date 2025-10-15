@@ -141,6 +141,27 @@ export interface SiteSettings {
   accentColor?: string;
 }
 
+export type SlideStatus = 'draft' | 'published';
+
+export interface HeroSlide {
+  id: string;
+  locale: string;
+  title: string;
+  subtitle?: string;
+  buttonText: string;
+  buttonLink: string;
+  imageUrl: string;
+  order: number;
+  active: boolean;
+  status: SlideStatus;
+  overlayOpacity?: number | null;
+  alt?: string | null;
+  startAt?: Date | null;
+  endAt?: Date | null;
+  updatedBy?: string | null;
+  updatedAt?: Date | null;
+}
+
 export interface PublicContent {
   siteSettings: SiteSettings;
   tourTypes: TourType[];
