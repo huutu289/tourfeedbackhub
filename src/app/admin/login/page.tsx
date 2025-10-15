@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, setPersistence, browserLocalPersistence, browserSessionPersistence } from 'firebase/auth';
 import { useAuth, useUser } from '@/firebase/provider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, LockKeyhole } from 'lucide-react';
 import { isUserAdmin } from '@/lib/admin-auth';
 
@@ -18,6 +19,7 @@ export default function AdminLoginPage() {
   const { user, isUserLoading } = useUser();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true); // Default to remember
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -40,6 +42,10 @@ export default function AdminLoginPage() {
     setIsLoading(true);
 
     try {
+      // Set persistence based on "Remember Me" checkbox
+      const persistence = rememberMe ? browserLocalPersistence : browserSessionPersistence;
+      await setPersistence(auth, persistence);
+
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const adminStatus = await isUserAdmin(userCredential.user);
 
@@ -48,6 +54,11 @@ export default function AdminLoginPage() {
         await auth.signOut();
         setIsLoading(false);
         return;
+      }
+
+      // Save email for convenience (optional)
+      if (rememberMe) {
+        localStorage.setItem('lastAdminEmail', email);
       }
 
       // Redirect to admin dashboard
@@ -64,6 +75,14 @@ export default function AdminLoginPage() {
       setIsLoading(false);
     }
   };
+
+  // Load saved email on mount
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('lastAdminEmail');
+    if (savedEmail) {
+      setEmail(savedEmail);
+    }
+  }, []);
 
   if (isUserLoading) {
     return (
@@ -114,6 +133,20 @@ export default function AdminLoginPage() {
                 required
                 autoComplete="current-password"
               />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="remember"
+                checked={rememberMe}
+                onCheckedChange={(checked) => setRememberMe(checked === true)}
+                disabled={isLoading}
+              />
+              <Label
+                htmlFor="remember"
+                className="text-sm font-normal cursor-pointer select-none"
+              >
+                Keep me signed in (lưu đăng nhập)
+              </Label>
             </div>
             {error && (
               <Alert variant="destructive">

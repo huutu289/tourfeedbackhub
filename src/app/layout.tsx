@@ -8,6 +8,7 @@ import Header from '@/components/header';
 import Footer from '@/components/footer';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { getSiteSettings } from '@/lib/content-service';
+import { getMenu } from '@/lib/nav';
 
 const playfair = Playfair_Display({
   subsets: ['latin'],
@@ -58,9 +59,14 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const siteSettings = await getSiteSettings();
+  const locale = siteSettings.defaultLanguage || 'en';
+  const [headerMenu, footerMenu] = await Promise.all([
+    getMenu('header', locale),
+    getMenu('footer', locale),
+  ]);
 
   return (
-    <html lang={siteSettings.defaultLanguage} suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <head>
         {searchConsoleVerification && (
           <meta name="google-site-verification" content={searchConsoleVerification} />
@@ -90,9 +96,9 @@ export default async function RootLayout({
         )}
         <FirebaseClientProvider>
           <div className="relative flex min-h-screen flex-col">
-            <Header />
+            <Header menu={headerMenu.items ?? []} siteSettings={siteSettings} />
             <main className="flex-1">{children}</main>
-            <Footer contact={siteSettings.contact} />
+            <Footer menu={footerMenu.items ?? []} siteSettings={siteSettings} />
           </div>
           <Toaster />
         </FirebaseClientProvider>

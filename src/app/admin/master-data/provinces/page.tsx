@@ -27,23 +27,18 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase/provider';
-import { collection, deleteDoc, doc, setDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, setDoc, writeBatch } from 'firebase/firestore';
 import { useMemoFirebase } from '@/firebase/firestore/use-memo-firebase';
 import { useCollection, type WithId } from '@/firebase/firestore/use-collection';
 import { requireAppCheckToken } from '@/lib/admin/app-check';
 import { useSearchPagination } from '@/hooks/use-search-pagination';
-import { Loader2, MoreHorizontal } from 'lucide-react';
+import { Loader2, Download, Upload, FileText, Pencil, Trash2, Trash } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PaginationControls } from '@/components/admin/pagination-controls';
 
@@ -72,8 +67,19 @@ export default function AdminProvincesPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedProvince, setSelectedProvince] = useState<Province | null>(null);
+  const [importText, setImportText] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+
+  // Column-based search states
+  const [nameSearch, setNameSearch] = useState('');
+  const [countrySearch, setCountrySearch] = useState('');
+
+  // Bulk selection states
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const provincesCollection = useMemoFirebase(() => collection(firestore, 'provinces'), [firestore]);
   const { data, isLoading } = useCollection(provincesCollection);
@@ -82,6 +88,15 @@ export default function AdminProvincesPage() {
     if (!data) return [];
     return data.map(mapProvince).sort((a, b) => a.name.localeCompare(b.name));
   }, [data]);
+
+  // Apply column-based filtering
+  const filteredProvinces = useMemo(() => {
+    return provinces.filter((province) => {
+      const matchesName = !nameSearch || province.name.toLowerCase().includes(nameSearch.toLowerCase());
+      const matchesCountry = !countrySearch || (province.country ?? '').toLowerCase().includes(countrySearch.toLowerCase());
+      return matchesName && matchesCountry;
+    });
+  }, [provinces, nameSearch, countrySearch]);
 
   const {
     searchTerm,
@@ -94,7 +109,7 @@ export default function AdminProvincesPage() {
     pageCount,
     filteredCount,
   } = useSearchPagination({
-    items: provinces,
+    items: filteredProvinces,
     filter: (province, term) => {
       const haystack = `${province.name} ${province.country ?? ''}`.toLowerCase();
       return haystack.includes(term);
@@ -173,6 +188,142 @@ export default function AdminProvincesPage() {
     }
   };
 
+  // Export to TXT file
+  const handleExportTxt = () => {
+    const content = provinces.map((prov) => `${prov.name}${prov.country ? `\t${prov.country}` : ''}`).join('\n');
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `provinces_${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({
+      title: 'Export successful',
+      description: `${provinces.length} provinces exported to TXT file.`,
+    });
+  };
+
+  // Import from file
+  const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      setImportText(text);
+      setIsImportDialogOpen(true);
+    };
+    reader.readAsText(file);
+    event.target.value = ''; // Reset input
+  };
+
+  // Process import from textarea
+  const handleImport = async () => {
+    if (!importText.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Import failed',
+        description: 'Please enter data to import.',
+      });
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      await requireAppCheckToken();
+      const lines = importText.split('\n').filter((line) => line.trim());
+      const batch = writeBatch(firestore);
+      let count = 0;
+
+      for (const line of lines) {
+        const parts = line.split('\t').map((p) => p.trim());
+        if (parts[0]) {
+          const newDocRef = doc(collection(firestore, 'provinces'));
+          batch.set(newDocRef, {
+            name: parts[0],
+            country: parts[1] || null,
+          });
+          count++;
+        }
+      }
+
+      await batch.commit();
+      toast({
+        title: 'Import successful',
+        description: `${count} provinces imported successfully.`,
+      });
+      setIsImportDialogOpen(false);
+      setImportText('');
+    } catch (error) {
+      const description = error instanceof Error ? error.message : 'Unable to import provinces.';
+      toast({
+        variant: 'destructive',
+        title: 'Import failed',
+        description,
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // Toggle selection for single item
+  const toggleSelection = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  // Toggle select all
+  const toggleSelectAll = () => {
+    if (selectedIds.size === paginatedItems.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedItems.map((item) => item.id)));
+    }
+  };
+
+  // Bulk delete
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+
+    const confirmed = confirm(`Are you sure you want to delete ${selectedIds.size} province(s)?`);
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+    try {
+      await requireAppCheckToken();
+      const batch = writeBatch(firestore);
+
+      selectedIds.forEach((id) => {
+        batch.delete(doc(firestore, 'provinces', id));
+      });
+
+      await batch.commit();
+      toast({
+        title: 'Provinces deleted',
+        description: `${selectedIds.size} province(s) deleted successfully.`,
+      });
+      setSelectedIds(new Set());
+    } catch (error) {
+      const description = error instanceof Error ? error.message : 'Unable to delete provinces.';
+      toast({
+        variant: 'destructive',
+        title: 'Delete failed',
+        description,
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -182,7 +333,50 @@ export default function AdminProvincesPage() {
             Catalogue the provinces where guides regularly deliver finished tours.
           </p>
         </div>
-        <Button onClick={openCreateDialog}>Add Province</Button>
+        <div className="flex flex-wrap gap-2">
+          {selectedIds.size > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleBulkDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash className="mr-2 h-4 w-4" />
+              )}
+              Delete ({selectedIds.size})
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={handleExportTxt}>
+            <Download className="mr-2 h-4 w-4" />
+            Export TXT
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => document.getElementById('import-file-provinces')?.click()}
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Import File
+          </Button>
+          <input
+            id="import-file-provinces"
+            type="file"
+            accept=".txt"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+          <Button variant="outline" size="sm" onClick={() => {
+            setImportText('');
+            setIsImportDialogOpen(true);
+          }}>
+            <FileText className="mr-2 h-4 w-4" />
+            Import Text
+          </Button>
+          <Button onClick={openCreateDialog}>Add Province</Button>
+        </div>
       </div>
 
       <Card>
@@ -216,21 +410,48 @@ export default function AdminProvincesPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={paginatedItems.length > 0 && selectedIds.size === paginatedItems.length}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Select all"
+                  />
+                </TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Country</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+              <TableRow>
+                <TableHead></TableHead>
+                <TableHead>
+                  <Input
+                    placeholder="Search name..."
+                    value={nameSearch}
+                    onChange={(e) => setNameSearch(e.target.value)}
+                    className="h-8"
+                  />
+                </TableHead>
+                <TableHead>
+                  <Input
+                    placeholder="Search country..."
+                    value={countrySearch}
+                    onChange={(e) => setCountrySearch(e.target.value)}
+                    className="h-8"
+                  />
+                </TableHead>
+                <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="h-24 text-center">
+                  <TableCell colSpan={4} className="h-24 text-center">
                     <Loader2 className="mx-auto h-6 w-6 animate-spin text-accent" />
                   </TableCell>
                 </TableRow>
               ) : paginatedItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
                     {filteredCount === 0 && provinces.length > 0
                       ? 'No provinces match your search.'
                       : 'No provinces have been added yet.'}
@@ -238,25 +459,41 @@ export default function AdminProvincesPage() {
                 </TableRow>
               ) : (
                 paginatedItems.map((province) => (
-                  <TableRow key={province.id}>
+                  <TableRow
+                    key={province.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => openEditDialog(province)}
+                  >
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedIds.has(province.id)}
+                        onCheckedChange={() => toggleSelection(province.id)}
+                        aria-label={`Select ${province.name}`}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{province.name}</TableCell>
                     <TableCell>{province.country || '—'}</TableCell>
                     <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => openEditDialog(province)}>Edit</DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(province)}>
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => openEditDialog(province)}
+                          title="Edit"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => handleDelete(province)}
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -314,6 +551,41 @@ export default function AdminProvincesPage() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Import Provinces</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground mb-2">
+                Enter one province per line. Format: <code className="text-xs bg-muted px-1 py-0.5 rounded">Name[TAB]Country</code>
+              </p>
+              <p className="text-xs text-muted-foreground mb-4">
+                Example:<br />
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">Da Nang	Vietnam</code><br />
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">Ho Chi Minh	Vietnam</code>
+              </p>
+              <Textarea
+                placeholder="Da Nang&#9;Vietnam&#10;Ho Chi Minh&#9;Vietnam&#10;Hanoi&#9;Vietnam"
+                value={importText}
+                onChange={(e) => setImportText(e.target.value)}
+                className="min-h-[200px] font-mono text-sm"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setIsImportDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleImport} disabled={isImporting}>
+                {isImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Import
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

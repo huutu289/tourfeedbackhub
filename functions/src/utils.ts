@@ -153,15 +153,24 @@ export function validateFileMetadata(metadata: {
   contentType: string;
   size: number;
 }): { valid: boolean; error?: string } {
-  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-  const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
+  // Different limits for images vs videos
+  const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB for images
+  const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB for videos
 
-  if (metadata.size > MAX_FILE_SIZE) {
-    return { valid: false, error: "File size exceeds 5MB limit" };
+  const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/jpg"];
+  const ALLOWED_VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/x-msvideo", "video/webm"];
+  const ALLOWED_TYPES = [...ALLOWED_IMAGE_TYPES, ...ALLOWED_VIDEO_TYPES];
+
+  const isVideo = ALLOWED_VIDEO_TYPES.includes(metadata.contentType);
+  const maxSize = isVideo ? MAX_VIDEO_SIZE : MAX_IMAGE_SIZE;
+
+  if (metadata.size > maxSize) {
+    const limitText = isVideo ? "100MB" : "10MB";
+    return { valid: false, error: `File size exceeds ${limitText} limit` };
   }
 
   if (!ALLOWED_TYPES.includes(metadata.contentType)) {
-    return { valid: false, error: "Invalid file type. Only JPEG, PNG, WebP, and HEIC are allowed" };
+    return { valid: false, error: "Invalid file type. Only JPEG, PNG, WebP, HEIC images and MP4, MOV, AVI, WebM videos are allowed" };
   }
 
   // Check for suspicious file names

@@ -39,13 +39,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, MoreHorizontal } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2, MoreHorizontal, Download, Upload, FileText, Pencil, Trash2, Trash } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore } from "@/firebase/provider";
-import { collection, deleteDoc, doc, setDoc, Timestamp } from "firebase/firestore";
+import { collection, deleteDoc, doc, setDoc, Timestamp, writeBatch } from "firebase/firestore";
 import { useMemoFirebase } from "@/firebase/firestore/use-memo-firebase";
 import { useCollection, type WithId } from "@/firebase/firestore/use-collection";
 import type { Story } from "@/lib/types";
@@ -115,6 +116,16 @@ export default function AdminStoriesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedStory, setSelectedStory] = useState<WithId<Story> | null>(null);
   const [storyToDelete, setStoryToDelete] = useState<WithId<Story> | null>(null);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+
+  // Column-based search states
+  const [titleSearch, setTitleSearch] = useState('');
+  const [excerptSearch, setExcerptSearch] = useState('');
+
+  // Bulk selection states
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
 
   const storiesRef = useMemoFirebase(
@@ -128,6 +139,15 @@ export default function AdminStoriesPage() {
     return data.map(mapStory).sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime());
   }, [data]);
 
+  // Apply column-based filtering
+  const filteredStories = useMemo(() => {
+    return stories.filter((story) => {
+      const matchesTitle = !titleSearch || story.title.toLowerCase().includes(titleSearch.toLowerCase());
+      const matchesExcerpt = !excerptSearch || story.excerpt.toLowerCase().includes(excerptSearch.toLowerCase());
+      return matchesTitle && matchesExcerpt;
+    });
+  }, [stories, titleSearch, excerptSearch]);
+
   const {
     searchTerm,
     setSearchTerm,
@@ -139,7 +159,7 @@ export default function AdminStoriesPage() {
     pageCount,
     filteredCount,
   } = useSearchPagination({
-    items: stories,
+    items: filteredStories,
     filter: (story, term) => {
       const haystack = `${story.title} ${story.excerpt}`.toLowerCase();
       return haystack.includes(term);
@@ -279,6 +299,149 @@ export default function AdminStoriesPage() {
     }
   };
 
+  // Export to TXT file
+  const handleExportTxt = () => {
+    const content = stories.map((story) =>
+      `${story.title}\t${story.excerpt}\t${story.coverImageUrl || ''}\t${formatDateInput(story.publishedAt)}\t${story.readTimeMinutes || ''}`
+    ).join('\n');
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `stories_${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({
+      title: 'Export successful',
+      description: `${stories.length} stories exported to TXT file.`,
+    });
+  };
+
+  // Import from file
+  const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      setImportText(text);
+      setIsImportDialogOpen(true);
+    };
+    reader.readAsText(file);
+    event.target.value = ''; // Reset input
+  };
+
+  // Process import from textarea
+  const handleImport = async () => {
+    if (!importText.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Import failed',
+        description: 'Please enter data to import.',
+      });
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      await requireAppCheckToken();
+      const lines = importText.split('\n').filter((line) => line.trim());
+      const batch = writeBatch(firestore);
+      let count = 0;
+
+      for (const line of lines) {
+        const parts = line.split('\t').map((p) => p.trim());
+        if (parts[0]) {
+          const newDocRef = doc(collection(firestore, 'stories'));
+          const publishedAt = parts[3] ? parseDateInput(parts[3]) : new Date();
+          batch.set(newDocRef, {
+            id: newDocRef.id,
+            title: parts[0],
+            excerpt: parts[1] || '',
+            coverImageUrl: parts[2] || '',
+            publishedAt: Timestamp.fromDate(publishedAt),
+            readTimeMinutes: parts[4] ? Number(parts[4]) : undefined,
+          });
+          count++;
+        }
+      }
+
+      await batch.commit();
+      toast({
+        title: 'Import successful',
+        description: `${count} stories imported successfully.`,
+      });
+      setIsImportDialogOpen(false);
+      setImportText('');
+    } catch (error) {
+      const description = error instanceof Error ? error.message : 'Unable to import stories.';
+      toast({
+        variant: 'destructive',
+        title: 'Import failed',
+        description,
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // Toggle selection for single item
+  const toggleSelection = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  // Toggle select all
+  const toggleSelectAll = () => {
+    if (selectedIds.size === paginatedStories.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedStories.map((story) => story.id)));
+    }
+  };
+
+  // Bulk delete
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+
+    const confirmed = confirm(`Are you sure you want to delete ${selectedIds.size} story(s)?`);
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+    try {
+      await requireAppCheckToken();
+      const batch = writeBatch(firestore);
+
+      selectedIds.forEach((id) => {
+        batch.delete(doc(firestore, 'stories', id));
+      });
+
+      await batch.commit();
+      toast({
+        title: 'Stories deleted',
+        description: `${selectedIds.size} story(s) deleted successfully.`,
+      });
+      setSelectedIds(new Set());
+    } catch (error) {
+      const description = error instanceof Error ? error.message : 'Unable to delete stories.';
+      toast({
+        variant: 'destructive',
+        title: 'Delete failed',
+        description,
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -288,7 +451,50 @@ export default function AdminStoriesPage() {
             Publish travel journals and updates that inspire travellers.
           </p>
         </div>
-        <Button onClick={handleAdd}>Add Story</Button>
+        <div className="flex flex-wrap gap-2">
+          {selectedIds.size > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleBulkDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash className="mr-2 h-4 w-4" />
+              )}
+              Delete ({selectedIds.size})
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={handleExportTxt}>
+            <Download className="mr-2 h-4 w-4" />
+            Export TXT
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => document.getElementById('import-file-stories')?.click()}
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Import File
+          </Button>
+          <input
+            id="import-file-stories"
+            type="file"
+            accept=".txt"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+          <Button variant="outline" size="sm" onClick={() => {
+            setImportText('');
+            setIsImportDialogOpen(true);
+          }}>
+            <FileText className="mr-2 h-4 w-4" />
+            Import Text
+          </Button>
+          <Button onClick={handleAdd}>Add Story</Button>
+        </div>
       </div>
 
       <Card>
@@ -325,23 +531,52 @@ export default function AdminStoriesPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={paginatedStories.length > 0 && selectedIds.size === paginatedStories.length}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Select all"
+                  />
+                </TableHead>
                 <TableHead>Title</TableHead>
                 <TableHead>Excerpt</TableHead>
                 <TableHead>Published</TableHead>
                 <TableHead className="text-right">Read time</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="w-[120px] text-right">Actions</TableHead>
+              </TableRow>
+              <TableRow>
+                <TableHead></TableHead>
+                <TableHead>
+                  <Input
+                    placeholder="Search title..."
+                    value={titleSearch}
+                    onChange={(e) => setTitleSearch(e.target.value)}
+                    className="h-8"
+                  />
+                </TableHead>
+                <TableHead>
+                  <Input
+                    placeholder="Search excerpt..."
+                    value={excerptSearch}
+                    onChange={(e) => setExcerptSearch(e.target.value)}
+                    className="h-8"
+                  />
+                </TableHead>
+                <TableHead></TableHead>
+                <TableHead></TableHead>
+                <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
+                  <TableCell colSpan={6} className="h-24 text-center">
                     <Loader2 className="mx-auto h-6 w-6 animate-spin text-accent" />
                   </TableCell>
                 </TableRow>
               ) : paginatedStories.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                     {filteredCount === 0 && stories.length > 0
                       ? "No stories match your search."
                       : "No stories have been published yet."}
@@ -349,7 +584,18 @@ export default function AdminStoriesPage() {
                 </TableRow>
               ) : (
                 paginatedStories.map((story) => (
-                  <TableRow key={story.id}>
+                  <TableRow
+                    key={story.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => handleEdit(story)}
+                  >
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedIds.has(story.id)}
+                        onCheckedChange={() => toggleSelection(story.id)}
+                        aria-label={`Select ${story.title}`}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{story.title}</TableCell>
                     <TableCell className="max-w-xl truncate">{story.excerpt}</TableCell>
                     <TableCell>{format(story.publishedAt, "MMM d, yyyy")}</TableCell>
@@ -357,29 +603,26 @@ export default function AdminStoriesPage() {
                       {story.readTimeMinutes ? `${story.readTimeMinutes} min` : "—"}
                     </TableCell>
                     <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => handleEdit(story)}>
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDuplicate(story)}>
-                            Duplicate
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => setStoryToDelete(story)}
-                          >
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleEdit(story)}
+                          title="Edit"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => setStoryToDelete(story)}
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -513,6 +756,34 @@ export default function AdminStoriesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Import Stories</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground mb-2">
+                Enter one story per line. Format: <code className="text-xs bg-muted px-1 py-0.5 rounded">Title[TAB]Excerpt[TAB]ImageURL[TAB]Date[TAB]ReadTime</code>
+              </p>
+              <Textarea
+                placeholder="Story Title&#9;Story excerpt...&#9;https://image.url&#9;2025-01-15&#9;5"
+                value={importText}
+                onChange={(e) => setImportText(e.target.value)}
+                className="min-h-[200px] font-mono text-sm"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setIsImportDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleImport} disabled={isImporting}>
+                {isImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Import
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

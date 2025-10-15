@@ -19,18 +19,47 @@
  */
 rules_version = '2';
 service cloud.firestore {
+  function isAdmin() {
+    return request.auth != null && request.auth.token.admin == true;
+  }
+
+  function isAllowlisted() {
+    return request.auth != null &&
+      request.auth.token.email in [
+        "huutu289@gmail.com",
+        "iposntmk@gmail.com"
+      ];
+  }
+
+  function canWriteAdmin() {
+    return isAdmin() || isAllowlisted();
+  }
+
   match /databases/{database}/documents {
 
+    match /navigationMenus/{menuId} {
+      allow read: if true;
+      allow write: if canWriteAdmin();
+
+      match /items/{itemId} {
+        allow read: if true;
+        allow write: if canWriteAdmin();
+      }
+    }
+
     match /siteSettings/{siteSettingsId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if canWriteAdmin();
     }
 
     match /tourTypes/{tourTypeId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if canWriteAdmin();
     }
 
     match /tours/{tourId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if canWriteAdmin();
     }
 
     match /feedback/{feedbackId} {
@@ -38,27 +67,33 @@ service cloud.firestore {
     }
 
     match /stories/{storyId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if canWriteAdmin();
     }
 
     match /reviews/{reviewId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if canWriteAdmin();
     }
 
     match /guides/{guideId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if canWriteAdmin();
     }
 
     match /languages/{languageId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if canWriteAdmin();
     }
 
     match /provinces/{provinceId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if canWriteAdmin();
     }
 
     match /nationalities/{nationalityId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if canWriteAdmin();
     }
   }
 }

@@ -46,13 +46,14 @@ import {
 } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MoreHorizontal, Loader2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { MoreHorizontal, Loader2, Download, Upload, FileText, Pencil, Trash2, Trash } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore } from "@/firebase/provider";
-import { collection, deleteDoc, doc, setDoc } from "firebase/firestore";
+import { collection, deleteDoc, doc, setDoc, writeBatch } from "firebase/firestore";
 import { useMemoFirebase } from "@/firebase/firestore/use-memo-firebase";
 import { useCollection, type WithId } from "@/firebase/firestore/use-collection";
 import type { TourType } from "@/lib/types";
@@ -86,6 +87,17 @@ export default function AdminTourTypesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedTourType, setSelectedTourType] = useState<WithId<TourType> | null>(null);
   const [tourTypeToDelete, setTourTypeToDelete] = useState<WithId<TourType> | null>(null);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+
+  // Column-based search states
+  const [titleSearch, setTitleSearch] = useState('');
+  const [descriptionSearch, setDescriptionSearch] = useState('');
+
+  // Bulk selection states
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const tourTypesRef = useMemoFirebase(
     () => collection(firestore, "tourTypes"),
@@ -103,6 +115,15 @@ export default function AdminTourTypesPage() {
     });
   }, [data]);
 
+  // Apply column-based filtering
+  const filteredTourTypes = useMemo(() => {
+    return tourTypes.filter((tourType) => {
+      const matchesTitle = !titleSearch || tourType.title.toLowerCase().includes(titleSearch.toLowerCase());
+      const matchesDescription = !descriptionSearch || tourType.description.toLowerCase().includes(descriptionSearch.toLowerCase());
+      return matchesTitle && matchesDescription;
+    });
+  }, [tourTypes, titleSearch, descriptionSearch]);
+
   const {
     searchTerm,
     setSearchTerm,
@@ -114,7 +135,7 @@ export default function AdminTourTypesPage() {
     pageCount,
     filteredCount,
   } = useSearchPagination({
-    items: tourTypes,
+    items: filteredTourTypes,
     filter: (item, term) => {
       const combined = `${item.title} ${item.description}`.toLowerCase();
       return combined.includes(term);
@@ -242,6 +263,145 @@ export default function AdminTourTypesPage() {
     }
   };
 
+  // Export to TXT file
+  const handleExportTxt = () => {
+    const content = tourTypes.map((tt) => `${tt.title}\t${tt.description}\t${tt.icon || ''}\t${tt.order || ''}`).join('\n');
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tour_types_${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({
+      title: 'Export successful',
+      description: `${tourTypes.length} tour types exported to TXT file.`,
+    });
+  };
+
+  // Import from file
+  const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      setImportText(text);
+      setIsImportDialogOpen(true);
+    };
+    reader.readAsText(file);
+    event.target.value = ''; // Reset input
+  };
+
+  // Process import from textarea
+  const handleImport = async () => {
+    if (!importText.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Import failed',
+        description: 'Please enter data to import.',
+      });
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      await requireAppCheckToken();
+      const lines = importText.split('\n').filter((line) => line.trim());
+      const batch = writeBatch(firestore);
+      let count = 0;
+
+      for (const line of lines) {
+        const parts = line.split('\t').map((p) => p.trim());
+        if (parts[0]) {
+          const newDocRef = doc(collection(firestore, 'tourTypes'));
+          batch.set(newDocRef, {
+            id: newDocRef.id,
+            title: parts[0],
+            description: parts[1] || '',
+            icon: parts[2] || undefined,
+            order: parts[3] ? Number(parts[3]) : undefined,
+          });
+          count++;
+        }
+      }
+
+      await batch.commit();
+      toast({
+        title: 'Import successful',
+        description: `${count} tour types imported successfully.`,
+      });
+      setIsImportDialogOpen(false);
+      setImportText('');
+    } catch (error) {
+      const description = error instanceof Error ? error.message : 'Unable to import tour types.';
+      toast({
+        variant: 'destructive',
+        title: 'Import failed',
+        description,
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // Toggle selection for single item
+  const toggleSelection = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  // Toggle select all
+  const toggleSelectAll = () => {
+    if (selectedIds.size === paginatedItems.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedItems.map((item) => item.id)));
+    }
+  };
+
+  // Bulk delete
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+
+    const confirmed = confirm(`Are you sure you want to delete ${selectedIds.size} tour type(s)?`);
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+    try {
+      await requireAppCheckToken();
+      const batch = writeBatch(firestore);
+
+      selectedIds.forEach((id) => {
+        batch.delete(doc(firestore, 'tourTypes', id));
+      });
+
+      await batch.commit();
+      toast({
+        title: 'Tour types deleted',
+        description: `${selectedIds.size} tour type(s) deleted successfully.`,
+      });
+      setSelectedIds(new Set());
+    } catch (error) {
+      const description = error instanceof Error ? error.message : 'Unable to delete tour types.';
+      toast({
+        variant: 'destructive',
+        title: 'Delete failed',
+        description,
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -251,7 +411,50 @@ export default function AdminTourTypesPage() {
             Define the categories that tours can be grouped under.
           </p>
         </div>
-        <Button onClick={handleOpenCreate}>Add Tour Type</Button>
+        <div className="flex flex-wrap gap-2">
+          {selectedIds.size > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleBulkDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash className="mr-2 h-4 w-4" />
+              )}
+              Delete ({selectedIds.size})
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={handleExportTxt}>
+            <Download className="mr-2 h-4 w-4" />
+            Export TXT
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => document.getElementById('import-file-tour-types')?.click()}
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Import File
+          </Button>
+          <input
+            id="import-file-tour-types"
+            type="file"
+            accept=".txt"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+          <Button variant="outline" size="sm" onClick={() => {
+            setImportText('');
+            setIsImportDialogOpen(true);
+          }}>
+            <FileText className="mr-2 h-4 w-4" />
+            Import Text
+          </Button>
+          <Button onClick={handleOpenCreate}>Add Tour Type</Button>
+        </div>
       </div>
 
       <Card>
@@ -288,23 +491,52 @@ export default function AdminTourTypesPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={paginatedItems.length > 0 && selectedIds.size === paginatedItems.length}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Select all"
+                  />
+                </TableHead>
                 <TableHead>Title</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Icon</TableHead>
                 <TableHead className="w-[80px] text-right">Order</TableHead>
                 <TableHead className="w-[120px] text-right">Actions</TableHead>
               </TableRow>
+              <TableRow>
+                <TableHead></TableHead>
+                <TableHead>
+                  <Input
+                    placeholder="Search title..."
+                    value={titleSearch}
+                    onChange={(e) => setTitleSearch(e.target.value)}
+                    className="h-8"
+                  />
+                </TableHead>
+                <TableHead>
+                  <Input
+                    placeholder="Search description..."
+                    value={descriptionSearch}
+                    onChange={(e) => setDescriptionSearch(e.target.value)}
+                    className="h-8"
+                  />
+                </TableHead>
+                <TableHead></TableHead>
+                <TableHead></TableHead>
+                <TableHead></TableHead>
+              </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
+                  <TableCell colSpan={6} className="h-24 text-center">
                     <Loader2 className="mx-auto h-5 w-5 animate-spin text-accent" />
                   </TableCell>
                 </TableRow>
               ) : paginatedItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                     {filteredCount === 0 && tourTypes.length > 0
                       ? "No tour types match your search."
                       : "No tour types have been created yet."}
@@ -312,35 +544,43 @@ export default function AdminTourTypesPage() {
                 </TableRow>
               ) : (
                 paginatedItems.map((tourType) => (
-                  <TableRow key={tourType.id}>
+                  <TableRow
+                    key={tourType.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => handleEdit(tourType)}
+                  >
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedIds.has(tourType.id)}
+                        onCheckedChange={() => toggleSelection(tourType.id)}
+                        aria-label={`Select ${tourType.title}`}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{tourType.title}</TableCell>
                     <TableCell className="max-w-lg truncate">{tourType.description}</TableCell>
                     <TableCell>{tourType.icon ?? "—"}</TableCell>
                     <TableCell className="text-right">{tourType.order ?? "—"}</TableCell>
                     <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => handleEdit(tourType)}>
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDuplicate(tourType)}>
-                            Duplicate
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => setTourTypeToDelete(tourType)}
-                          >
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleEdit(tourType)}
+                          title="Edit"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => setTourTypeToDelete(tourType)}
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -456,6 +696,41 @@ export default function AdminTourTypesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Import Tour Types</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground mb-2">
+                Enter one tour type per line. Format: <code className="text-xs bg-muted px-1 py-0.5 rounded">Title[TAB]Description[TAB]Icon[TAB]Order</code>
+              </p>
+              <p className="text-xs text-muted-foreground mb-4">
+                Example:<br />
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">Cycling Tours	Explore on two wheels	bike	1</code><br />
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">Cultural Tours	Immerse in local culture	landmark	2</code>
+              </p>
+              <Textarea
+                placeholder="Cycling Tours&#9;Explore on two wheels&#9;bike&#9;1&#10;Cultural Tours&#9;Immerse in local culture&#9;landmark&#9;2"
+                value={importText}
+                onChange={(e) => setImportText(e.target.value)}
+                className="min-h-[200px] font-mono text-sm"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setIsImportDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleImport} disabled={isImporting}>
+                {isImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Import
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -27,23 +27,18 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase/provider';
-import { collection, deleteDoc, doc, setDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, setDoc, writeBatch } from 'firebase/firestore';
 import { useMemoFirebase } from '@/firebase/firestore/use-memo-firebase';
 import { useCollection, type WithId } from '@/firebase/firestore/use-collection';
 import { requireAppCheckToken } from '@/lib/admin/app-check';
 import { useSearchPagination } from '@/hooks/use-search-pagination';
-import { Loader2, MoreHorizontal } from 'lucide-react';
+import { Loader2, Download, Upload, FileText, Pencil, Trash2, Trash } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PaginationControls } from '@/components/admin/pagination-controls';
 import { MultiSelect } from '@/components/ui/multi-select';
@@ -93,6 +88,14 @@ export default function AdminGuidesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedGuide, setSelectedGuide] = useState<Guide | null>(null);
 
+  // Column-based search states
+  const [nameSearch, setNameSearch] = useState('');
+  const [contactSearch, setContactSearch] = useState('');
+
+  // Bulk selection states
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const guidesCollection = useMemoFirebase(() => collection(firestore, 'guides'), [firestore]);
   const languagesCollection = useMemoFirebase(() => collection(firestore, 'languages'), [firestore]);
   const provincesCollection = useMemoFirebase(() => collection(firestore, 'provinces'), [firestore]);
@@ -107,6 +110,17 @@ export default function AdminGuidesPage() {
     if (!guideDocs) return [];
     return guideDocs.map(mapGuide).sort((a, b) => a.name.localeCompare(b.name));
   }, [guideDocs]);
+
+  // Apply column-based filtering
+  const filteredGuides = useMemo(() => {
+    return guides.filter((guide) => {
+      const matchesName = !nameSearch || guide.name.toLowerCase().includes(nameSearch.toLowerCase());
+      const matchesContact = !contactSearch ||
+        (guide.phone ?? '').toLowerCase().includes(contactSearch.toLowerCase()) ||
+        (guide.email ?? '').toLowerCase().includes(contactSearch.toLowerCase());
+      return matchesName && matchesContact;
+    });
+  }, [guides, nameSearch, contactSearch]);
 
   const languageOptions: MasterOption[] = useMemo(() => {
     if (!languageDocs) return [];
@@ -148,7 +162,7 @@ export default function AdminGuidesPage() {
     pageCount,
     filteredCount,
   } = useSearchPagination({
-    items: guides,
+    items: filteredGuides,
     filter: (guide, term) => {
       const haystack = `${guide.name} ${guide.phone ?? ''} ${guide.email ?? ''}`.toLowerCase();
       return haystack.includes(term);
@@ -254,6 +268,60 @@ export default function AdminGuidesPage() {
       .join(', ');
   };
 
+  // Toggle selection for single item
+  const toggleSelection = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  // Toggle select all
+  const toggleSelectAll = () => {
+    if (selectedIds.size === paginatedItems.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedItems.map((item) => item.id)));
+    }
+  };
+
+  // Bulk delete
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+
+    const confirmed = confirm(`Are you sure you want to delete ${selectedIds.size} guide(s)?`);
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+    try {
+      await requireAppCheckToken();
+      const batch = writeBatch(firestore);
+
+      selectedIds.forEach((id) => {
+        batch.delete(doc(firestore, 'guides', id));
+      });
+
+      await batch.commit();
+      toast({
+        title: 'Guides deleted',
+        description: `${selectedIds.size} guide(s) deleted successfully.`,
+      });
+      setSelectedIds(new Set());
+    } catch (error) {
+      const description = error instanceof Error ? error.message : 'Unable to delete guides.';
+      toast({
+        variant: 'destructive',
+        title: 'Delete failed',
+        description,
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -263,7 +331,24 @@ export default function AdminGuidesPage() {
             Maintain the master list of guides and their service capabilities.
           </p>
         </div>
-        <Button onClick={openCreateDialog}>Add Guide</Button>
+        <div className="flex flex-wrap gap-2">
+          {selectedIds.size > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleBulkDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash className="mr-2 h-4 w-4" />
+              )}
+              Delete ({selectedIds.size})
+            </Button>
+          )}
+          <Button onClick={openCreateDialog}>Add Guide</Button>
+        </div>
       </div>
 
       <Card>
@@ -297,6 +382,13 @@ export default function AdminGuidesPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={paginatedItems.length > 0 && selectedIds.size === paginatedItems.length}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Select all"
+                  />
+                </TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Contact</TableHead>
                 <TableHead>Languages</TableHead>
@@ -304,17 +396,40 @@ export default function AdminGuidesPage() {
                 <TableHead>Nationalities</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
+              <TableRow>
+                <TableHead></TableHead>
+                <TableHead>
+                  <Input
+                    placeholder="Search name..."
+                    value={nameSearch}
+                    onChange={(e) => setNameSearch(e.target.value)}
+                    className="h-8"
+                  />
+                </TableHead>
+                <TableHead>
+                  <Input
+                    placeholder="Search contact..."
+                    value={contactSearch}
+                    onChange={(e) => setContactSearch(e.target.value)}
+                    className="h-8"
+                  />
+                </TableHead>
+                <TableHead></TableHead>
+                <TableHead></TableHead>
+                <TableHead></TableHead>
+                <TableHead></TableHead>
+              </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center">
+                  <TableCell colSpan={7} className="h-24 text-center">
                     <Loader2 className="mx-auto h-6 w-6 animate-spin text-accent" />
                   </TableCell>
                 </TableRow>
               ) : paginatedItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                     {filteredCount === 0 && guides.length > 0
                       ? 'No guides match your search.'
                       : 'No guides have been added yet.'}
@@ -322,7 +437,18 @@ export default function AdminGuidesPage() {
                 </TableRow>
               ) : (
                 paginatedItems.map((guide) => (
-                  <TableRow key={guide.id}>
+                  <TableRow
+                    key={guide.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => openEditDialog(guide)}
+                  >
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedIds.has(guide.id)}
+                        onCheckedChange={() => toggleSelection(guide.id)}
+                        aria-label={`Select ${guide.name}`}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{guide.name}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {guide.phone || '—'}
@@ -333,21 +459,26 @@ export default function AdminGuidesPage() {
                     <TableCell className="text-sm text-muted-foreground">{resolveLabels(guide.provinceIds)}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{resolveLabels(guide.nationalityIds)}</TableCell>
                     <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => openEditDialog(guide)}>Edit</DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(guide)}>
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => openEditDialog(guide)}
+                          title="Edit"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => handleDelete(guide)}
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

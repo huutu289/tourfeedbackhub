@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Plus, Trash2 } from "lucide-react";
@@ -27,6 +27,12 @@ import { requireAppCheckToken } from "@/lib/admin/app-check";
 import { siteSettings as fallbackSettings } from "@/lib/data";
 import type { SiteSettings } from "@/lib/types";
 
+const optionalUrl = z
+  .string()
+  .url("Must be a valid URL")
+  .or(z.literal(""))
+  .optional();
+
 const contactSchema = z.object({
   email: z
     .string()
@@ -35,10 +41,18 @@ const contactSchema = z.object({
     .optional(),
   phone: z.string().or(z.literal("")).optional(),
   whatsapp: z.string().or(z.literal("")).optional(),
+  address: z.string().or(z.literal("")).optional(),
+  mapEmbedUrl: optionalUrl,
   zalo: z.string().or(z.literal("")).optional(),
-  facebook: z.string().or(z.literal("")).optional(),
-  instagram: z.string().or(z.literal("")).optional(),
-  location: z.string().or(z.literal("")).optional(),
+});
+
+const socialSchema = z.object({
+  facebook: optionalUrl,
+  instagram: optionalUrl,
+  youtube: optionalUrl,
+  tiktok: optionalUrl,
+  whatsapp: optionalUrl,
+  zalo: optionalUrl,
 });
 
 const colorSchema = z
@@ -49,10 +63,14 @@ const colorSchema = z
 
 const siteSettingsSchema = z
   .object({
+    siteName: z.string().min(1, "Site name is required"),
+    logoUrlLight: optionalUrl,
+    logoUrlDark: optionalUrl,
+    copyright: z.string().or(z.literal("")).optional(),
     heroTitle: z.string().min(1, "Hero title is required"),
     heroSubtitle: z.string().min(1, "Hero subtitle is required"),
     heroCtaLabel: z.string().min(1, "CTA label is required"),
-    heroMediaUrl: z.string().url("Must be a valid URL").or(z.literal("")).optional(),
+    heroMediaUrl: optionalUrl,
     aboutTitle: z.string().min(1, "About title is required"),
     aboutDescription: z.string().min(1, "About description is required"),
     missionStatement: z.string().or(z.literal("")).optional(),
@@ -70,6 +88,7 @@ const siteSettingsSchema = z
     primaryColor: colorSchema,
     accentColor: colorSchema,
     contact: contactSchema,
+    social: socialSchema,
   })
   .superRefine((data, ctx) => {
     const languages = data.languages.map((item) => item.value.trim().toLowerCase());
@@ -93,6 +112,9 @@ function ensureArray(values?: string[]): { value: string }[] {
 
 function mergeSettings(doc?: Partial<SiteSettings>): SiteSettings {
   return {
+    siteName: doc?.siteName ?? fallbackSettings.siteName,
+    logoUrlLight: doc?.logoUrlLight ?? fallbackSettings.logoUrlLight,
+    logoUrlDark: doc?.logoUrlDark ?? fallbackSettings.logoUrlDark,
     heroTitle: doc?.heroTitle ?? fallbackSettings.heroTitle,
     heroSubtitle: doc?.heroSubtitle ?? fallbackSettings.heroSubtitle,
     heroCtaLabel: doc?.heroCtaLabel ?? fallbackSettings.heroCtaLabel,
@@ -105,6 +127,11 @@ function mergeSettings(doc?: Partial<SiteSettings>): SiteSettings {
       ...fallbackSettings.contact,
       ...(doc?.contact ?? {}),
     },
+    social: {
+      ...fallbackSettings.social,
+      ...(doc?.social ?? {}),
+    },
+    copyright: doc?.copyright ?? fallbackSettings.copyright,
     languages: Array.isArray(doc?.languages) && doc?.languages.length
       ? doc.languages
       : fallbackSettings.languages,
@@ -116,6 +143,10 @@ function mergeSettings(doc?: Partial<SiteSettings>): SiteSettings {
 
 function toFormValues(settings: SiteSettings): SiteSettingsFormValues {
   return {
+    siteName: settings.siteName,
+    logoUrlLight: settings.logoUrlLight ?? "",
+    logoUrlDark: settings.logoUrlDark ?? "",
+    copyright: settings.copyright ?? "",
     heroTitle: settings.heroTitle,
     heroSubtitle: settings.heroSubtitle,
     heroCtaLabel: settings.heroCtaLabel,
@@ -132,10 +163,17 @@ function toFormValues(settings: SiteSettings): SiteSettingsFormValues {
       email: settings.contact.email ?? "",
       phone: settings.contact.phone ?? "",
       whatsapp: settings.contact.whatsapp ?? "",
+      address: settings.contact.address ?? "",
+      mapEmbedUrl: settings.contact.mapEmbedUrl ?? "",
       zalo: settings.contact.zalo ?? "",
-      facebook: settings.contact.facebook ?? "",
-      instagram: settings.contact.instagram ?? "",
-      location: settings.contact.location ?? "",
+    },
+    social: {
+      facebook: settings.social.facebook ?? "",
+      instagram: settings.social.instagram ?? "",
+      youtube: settings.social.youtube ?? "",
+      tiktok: settings.social.tiktok ?? "",
+      whatsapp: settings.social.whatsapp ?? "",
+      zalo: settings.social.zalo ?? "",
     },
   };
 }
@@ -144,6 +182,19 @@ function cleanString(value?: string | null): string | undefined {
   if (!value) return undefined;
   const trimmed = value.trim();
   return trimmed.length ? trimmed : undefined;
+}
+
+function cleanOptionalUrl(value?: string | null): string | undefined | null {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  const trimmed = value.trim();
+  if (!trimmed.length) return undefined;
+  return trimmed;
+}
+
+function removeUndefined<T extends Record<string, unknown>>(input: T): T {
+  const entries = Object.entries(input).filter(([, value]) => value !== undefined);
+  return Object.fromEntries(entries) as T;
 }
 
 function preparePayload(values: SiteSettingsFormValues): SiteSettings {
@@ -156,6 +207,9 @@ function preparePayload(values: SiteSettingsFormValues): SiteSettings {
     .filter(Boolean);
 
   return {
+    siteName: values.siteName.trim(),
+    logoUrlLight: cleanString(values.logoUrlLight),
+    logoUrlDark: cleanString(values.logoUrlDark),
     heroTitle: values.heroTitle.trim(),
     heroSubtitle: values.heroSubtitle.trim(),
     heroCtaLabel: values.heroCtaLabel.trim(),
@@ -164,19 +218,27 @@ function preparePayload(values: SiteSettingsFormValues): SiteSettings {
     aboutDescription: values.aboutDescription.trim(),
     missionStatement: cleanString(values.missionStatement),
     values: formattedValues,
-    contact: {
+    contact: removeUndefined({
       email: cleanString(values.contact.email),
       phone: cleanString(values.contact.phone),
       whatsapp: cleanString(values.contact.whatsapp),
-      zalo: cleanString(values.contact.zalo),
-      facebook: cleanString(values.contact.facebook),
-      instagram: cleanString(values.contact.instagram),
-      location: cleanString(values.contact.location),
-    },
+      address: cleanString(values.contact.address),
+      mapEmbedUrl: cleanOptionalUrl(values.contact.mapEmbedUrl) ?? undefined,
+      zalo: cleanOptionalUrl(values.contact.zalo) ?? undefined,
+    }),
+    social: removeUndefined({
+      facebook: cleanOptionalUrl(values.social.facebook) ?? undefined,
+      instagram: cleanOptionalUrl(values.social.instagram) ?? undefined,
+      youtube: cleanOptionalUrl(values.social.youtube) ?? undefined,
+      tiktok: cleanOptionalUrl(values.social.tiktok) ?? undefined,
+      whatsapp: cleanOptionalUrl(values.social.whatsapp) ?? undefined,
+      zalo: cleanOptionalUrl(values.social.zalo) ?? undefined,
+    }),
     languages: formattedLanguages,
     defaultLanguage: values.defaultLanguage.trim(),
     primaryColor: cleanString(values.primaryColor),
     accentColor: cleanString(values.accentColor),
+    copyright: cleanString(values.copyright),
   };
 }
 
@@ -186,7 +248,7 @@ export default function SiteContentPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   const settingsRef = useMemoFirebase(
-    () => doc(firestore, "siteSettings", "public"),
+    () => doc(firestore, "siteSettings", "default"),
     [firestore]
   );
 
@@ -256,6 +318,71 @@ export default function SiteContentPage() {
       ) : (
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Brand Identity</CardTitle>
+                <CardDescription>
+                  Control the site name, logos, and footer attribution.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="siteName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Site Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Tour Insights Hub" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="logoUrlLight"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Light Logo URL</FormLabel>
+                        <FormControl>
+                          <Input placeholder="https://…" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="logoUrlDark"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Dark Logo URL</FormLabel>
+                        <FormControl>
+                          <Input placeholder="https://…" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="copyright"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Copyright Line</FormLabel>
+                      <FormControl>
+                        <Input placeholder="© 2025 Your Name. All rights reserved." {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle>Hero Section</CardTitle>
@@ -420,7 +547,7 @@ export default function SiteContentPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Languages & Branding</CardTitle>
+                <CardTitle>Languages & Theme</CardTitle>
                 <CardDescription>
                   Configure supported languages and brand colours.
                 </CardDescription>
@@ -519,9 +646,9 @@ export default function SiteContentPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Contact Channels</CardTitle>
+                <CardTitle>Contact Details</CardTitle>
                 <CardDescription>
-                  These details appear on the Contact page and the global footer.
+                  These details appear in the header CTA, footer, and contact page.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-4 md:grid-cols-2">
@@ -545,7 +672,7 @@ export default function SiteContentPage() {
                     <FormItem>
                       <FormLabel>Phone</FormLabel>
                       <FormControl>
-                        <Input placeholder="+84 123 456 789" {...field} />
+                        <Input placeholder="+84 90 812 3456" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -556,9 +683,35 @@ export default function SiteContentPage() {
                   name="contact.whatsapp"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>WhatsApp Link</FormLabel>
+                      <FormLabel>WhatsApp Number or Link</FormLabel>
                       <FormControl>
-                        <Input placeholder="https://wa.me/…" {...field} />
+                        <Input placeholder="84908123456" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="contact.address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Address</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Hue, Viet Nam" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="contact.mapEmbedUrl"
+                  render={({ field }) => (
+                    <FormItem className="md:col-span-2">
+                      <FormLabel>Map Embed URL</FormLabel>
+                      <FormControl>
+                        <Input placeholder="https://maps.google.com/…" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -569,7 +722,7 @@ export default function SiteContentPage() {
                   name="contact.zalo"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Zalo Link</FormLabel>
+                      <FormLabel>Zalo Link (optional)</FormLabel>
                       <FormControl>
                         <Input placeholder="https://zalo.me/…" {...field} />
                       </FormControl>
@@ -577,14 +730,25 @@ export default function SiteContentPage() {
                     </FormItem>
                   )}
                 />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Social Links</CardTitle>
+                <CardDescription>
+                  Showcase your community channels in the footer and contact sections.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 md:grid-cols-2">
                 <FormField
                   control={form.control}
-                  name="contact.facebook"
+                  name="social.facebook"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Facebook</FormLabel>
                       <FormControl>
-                        <Input placeholder="https://facebook.com/…" {...field} />
+                        <Input placeholder="https://facebook.com/your.page" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -592,7 +756,7 @@ export default function SiteContentPage() {
                 />
                 <FormField
                   control={form.control}
-                  name="contact.instagram"
+                  name="social.instagram"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Instagram</FormLabel>
@@ -605,12 +769,51 @@ export default function SiteContentPage() {
                 />
                 <FormField
                   control={form.control}
-                  name="contact.location"
+                  name="social.youtube"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Primary Location</FormLabel>
+                      <FormLabel>YouTube</FormLabel>
                       <FormControl>
-                        <Input placeholder="Da Nang, Vietnam" {...field} />
+                        <Input placeholder="https://youtube.com/…" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="social.tiktok"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>TikTok</FormLabel>
+                      <FormControl>
+                        <Input placeholder="https://www.tiktok.com/@…" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="social.whatsapp"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>WhatsApp Link (optional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="https://wa.me/…" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="social.zalo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Zalo Link (optional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="https://zalo.me/…" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

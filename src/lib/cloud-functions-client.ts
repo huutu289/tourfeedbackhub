@@ -104,11 +104,22 @@ async function callFunction(path: string, body: unknown, additionalHeaders: Head
   return response.json();
 }
 
-async function uploadAttachment(upload: UploadDetails, file: File) {
+async function uploadAttachment(upload: UploadDetails, file: File, authToken?: string) {
   const method = upload.method ?? "PUT";
   const headers = new Headers(upload.headers ?? {});
   if (!headers.has("Content-Type")) {
     headers.set("Content-Type", file.type);
+  }
+
+  // Add Firebase Auth token if uploading to Firebase Storage REST API
+  if (authToken && upload.uploadUrl.includes('firebasestorage.googleapis.com')) {
+    headers.set("Authorization", `Bearer ${authToken}`);
+
+    // Also add App Check token for Firebase Storage
+    const appCheckToken = await getAppCheckToken();
+    if (appCheckToken) {
+      headers.set("X-Firebase-AppCheck", appCheckToken);
+    }
   }
 
   const uploadResponse = await fetch(upload.uploadUrl, {
@@ -152,37 +163,80 @@ export async function rejectFeedback(feedbackId: string) {
   await callFunction("adminFeedbackReject", { feedbackId });
 }
 
-// Admin: get signed upload URL for tour media, upload file, return download URL
+// Admin: upload tour media directly to Cloud Storage
 export async function uploadTourMedia(tourId: string, file: File): Promise<string> {
-  const idToken = await getIdToken();
-  if (!idToken) throw new Error('Not authenticated');
+  try {
+    const idToken = await getIdToken();
+    if (!idToken) {
+      throw new Error('Not authenticated. Please sign in again.');
+    }
 
-  const payload = {
-    tourId,
-    fileName: file.name,
-    contentType: file.type,
-    size: file.size,
-  };
+    console.log('Uploading file:', { tourId, fileName: file.name, size: file.size, type: file.type });
 
-  const resp = await callFunction(
-    'adminTourUploadUrl',
-    payload,
-    { Authorization: `Bearer ${idToken}` }
-  );
+    // For files < 8MB, use base64 direct upload (avoids App Check issues with Storage REST API)
+    // For larger files, fall back to signed URL approach
+    const useDirectUpload = file.size < 8 * 1024 * 1024; // 8MB threshold
 
-  const { success, uploadDetails, downloadUrl, error } = resp as {
-    success: boolean;
-    uploadDetails: UploadDetails;
-    downloadUrl: string;
-    error?: CloudFunctionError;
-  };
+    if (useDirectUpload) {
+      console.log('Using direct upload (base64)');
 
-  if (!success || !uploadDetails) {
-    throw new Error(error?.message || 'Failed to get upload URL');
+      // Read file as base64
+      const fileBuffer = await file.arrayBuffer();
+      const base64Data = btoa(
+        new Uint8Array(fileBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+      );
+
+      // Use direct upload endpoint with base64 payload
+      const response = await callFunction(
+        'adminTourUploadDirect',
+        {
+          tourId,
+          fileName: file.name,
+          contentType: file.type,
+          size: file.size,
+          fileData: base64Data,
+        },
+        { Authorization: `Bearer ${idToken}` }
+      );
+
+      if (!response.success || !response.downloadUrl) {
+        throw new Error(response.error?.message || 'Upload failed');
+      }
+
+      console.log('File uploaded successfully:', response.downloadUrl);
+      return response.downloadUrl;
+    } else {
+      console.log('Using signed URL upload (file too large for base64)');
+
+      // Request a signed upload URL for large files
+      const response = await callFunction(
+        'adminTourUploadUrl',
+        {
+          tourId,
+          fileName: file.name,
+          contentType: file.type,
+          size: file.size,
+        },
+        { Authorization: `Bearer ${idToken}` }
+      );
+
+      if (!response.success || !response.uploadDetails || !response.downloadUrl) {
+        throw new Error(response.error?.message || 'Upload failed');
+      }
+
+      // Upload with auth token and App Check
+      await uploadAttachment(response.uploadDetails, file, idToken);
+
+      console.log('File uploaded successfully:', response.downloadUrl);
+      return response.downloadUrl as string;
+    }
+  } catch (error) {
+    console.error('uploadTourMedia error:', error);
+    if (error instanceof Error) {
+      throw new Error(`File upload failed for "${file.name}": ${error.message}`);
+    }
+    throw error;
   }
-
-  await uploadAttachment(uploadDetails, file);
-  return downloadUrl;
 }
 
 export type ClientReview = Pick<Review, "id" | "authorDisplay" | "country" | "language" | "rating" | "message" | "tourId" | "tourName" | "photoUrls" | "createdAt" | "summary">;

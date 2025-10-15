@@ -6,7 +6,13 @@ import { getPublicContent } from '@/lib/content-service';
 
 export default async function ContactPage() {
   const { siteSettings } = await getPublicContent();
-  const { contact } = siteSettings;
+  const { contact, social } = siteSettings;
+
+  const whatsappLink = contact.whatsapp
+    ? contact.whatsapp.startsWith('http')
+      ? contact.whatsapp
+      : `https://wa.me/${contact.whatsapp.replace(/\D/g, '')}`
+    : null;
 
   return (
     <div className="py-16 md:py-24">
@@ -39,10 +45,10 @@ export default async function ContactPage() {
                     </Link>
                   </p>
                 )}
-                {contact.location && (
+                {contact.address && (
                   <p className="flex items-center gap-3">
                     <MapPin className="h-5 w-5 text-accent" />
-                    <span>{contact.location}</span>
+                    <span>{contact.address}</span>
                   </p>
                 )}
               </CardContent>
@@ -53,9 +59,9 @@ export default async function ContactPage() {
                 <CardTitle className="text-xl font-headline">Messaging Apps</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-wrap gap-3">
-                {contact.whatsapp && (
+                {whatsappLink && (
                   <Button asChild variant="outline">
-                    <Link href={contact.whatsapp} target="_blank" rel="noopener noreferrer">
+                    <Link href={whatsappLink} target="_blank" rel="noopener noreferrer">
                       <MessageCircle className="h-4 w-4 mr-2" /> WhatsApp
                     </Link>
                   </Button>
@@ -67,16 +73,16 @@ export default async function ContactPage() {
                     </Link>
                   </Button>
                 )}
-                {contact.facebook && (
+                {social.facebook && (
                   <Button asChild variant="outline">
-                    <Link href={contact.facebook} target="_blank" rel="noopener noreferrer">
+                    <Link href={social.facebook} target="_blank" rel="noopener noreferrer">
                       <Facebook className="h-4 w-4 mr-2" /> Facebook
                     </Link>
                   </Button>
                 )}
-                {contact.instagram && (
+                {social.instagram && (
                   <Button asChild variant="outline">
-                    <Link href={contact.instagram} target="_blank" rel="noopener noreferrer">
+                    <Link href={social.instagram} target="_blank" rel="noopener noreferrer">
                       <Instagram className="h-4 w-4 mr-2" /> Instagram
                     </Link>
                   </Button>

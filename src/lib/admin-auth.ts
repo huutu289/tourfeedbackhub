@@ -3,6 +3,31 @@
  */
 
 import { User } from 'firebase/auth';
+import { isEmailAdmin } from '@/lib/admin-allowlist';
+
+async function grantAdminClaimForAllowlist(user: User): Promise<boolean> {
+  try {
+    const token = await user.getIdToken(true);
+    const response = await fetch('/api/admin/claims', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      console.warn('Failed to grant admin claim:', await response.text());
+      return false;
+    }
+
+    await user.getIdToken(true);
+    const refreshed = await user.getIdTokenResult();
+    return refreshed.claims.admin === true;
+  } catch (error) {
+    console.error('Error granting admin claim:', error);
+    return false;
+  }
+}
 
 /**
  * Check if a user has admin privileges
@@ -12,7 +37,22 @@ export async function isUserAdmin(user: User | null): Promise<boolean> {
   if (!user) return false;
 
   try {
-    const idTokenResult = await user.getIdTokenResult();
+    let idTokenResult = await user.getIdTokenResult();
+    if (idTokenResult.claims.admin === true) {
+      return true;
+    }
+
+    const email = (idTokenResult.claims.email as string | undefined) ?? user.email;
+    if (!isEmailAdmin(email)) {
+      return false;
+    }
+
+    const granted = await grantAdminClaimForAllowlist(user);
+    if (!granted) {
+      return false;
+    }
+
+    idTokenResult = await user.getIdTokenResult();
     return idTokenResult.claims.admin === true;
   } catch (error) {
     console.error('Error checking admin status:', error);
@@ -32,18 +72,4 @@ export async function refreshAdminClaims(user: User): Promise<boolean> {
     console.error('Error refreshing admin claims:', error);
     return false;
   }
-}
-
-/**
- * Admin-only email list for additional verification
- * This is a backup check in case custom claims aren't set
- */
-const ADMIN_EMAILS = [
-  'huutu289@gmail.com',
-  'iposntmk@gmail.com',
-];
-
-export function isEmailAdmin(email: string | null | undefined): boolean {
-  if (!email) return false;
-  return ADMIN_EMAILS.includes(email.toLowerCase());
 }

@@ -9,6 +9,7 @@ import * as admin from "firebase-admin";
 import { onRequest } from "firebase-functions/v2/https";
 import { randomUUID } from "node:crypto";
 import { verifyAppCheck, validateFileMetadata } from "./utils";
+import { getStorage } from "firebase-admin/storage";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -83,24 +84,40 @@ export const adminTourUploadUrl = onRequest(
         return;
       }
 
-      const bucket = admin.storage().bucket();
+      // Get default bucket
+      const storage = getStorage();
+      const bucket = storage.bucket();
+
       const safeBaseName = payload.fileName.replace(/[^A-Za-z0-9._-]/g, "_");
       const objectPath = `tours/${payload.tourId}/${randomUUID()}_${safeBaseName}`;
       const file = bucket.file(objectPath);
 
       let uploadUrl: string;
       try {
-        const expires = Date.now() + 10 * 60 * 1000; // 10 minutes
-        [uploadUrl] = await file.getSignedUrl({
+        const expiresAt = new Date();
+        expiresAt.setMinutes(expiresAt.getMinutes() + 10); // 10 minutes from now
+
+        // Try to get signed URL
+        const [url] = await file.getSignedUrl({
           version: "v4",
           action: "write",
-          expires,
+          expires: expiresAt,
           contentType: payload.contentType,
         });
+        uploadUrl = url;
       } catch (e: any) {
-        console.error("getSignedUrl failed", { bucket: bucket.name, objectPath, error: e?.message || e });
-        response.status(500).json({ success: false, error: { code: "sign_url_failed", message: "Could not create signed URL" } });
-        return;
+        console.error("getSignedUrl failed - falling back to public upload token", {
+          bucket: bucket.name,
+          objectPath,
+          error: e?.message || e,
+          stack: e?.stack,
+        });
+
+        // Fallback: Use Firebase Storage REST API upload URL
+        const bucketName = bucket.name;
+        uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o?name=${encodeURIComponent(objectPath)}&uploadType=media`;
+
+        console.log("Using fallback upload URL", { uploadUrl, objectPath });
       }
 
       const downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(objectPath)}?alt=media`;
@@ -109,7 +126,7 @@ export const adminTourUploadUrl = onRequest(
         success: true,
         uploadDetails: {
           uploadUrl,
-          method: "PUT",
+          method: uploadUrl.includes("uploadType=media") ? "POST" : "PUT",
           headers: { "Content-Type": payload.contentType },
           uploadId: objectPath,
         },

@@ -92,26 +92,49 @@ function toDate(value: any): Date {
 }
 
 function mapSiteSettings(data: any): SiteSettings {
+  const base = {
+    ...fallbackSiteSettings,
+    contact: { ...fallbackSiteSettings.contact },
+    social: { ...fallbackSiteSettings.social },
+    values: Array.isArray(fallbackSiteSettings.values) ? [...fallbackSiteSettings.values] : [],
+    languages: Array.isArray(fallbackSiteSettings.languages) ? [...fallbackSiteSettings.languages] : [],
+  };
+
+  if (!data) {
+    return base;
+  }
+
   return {
-    heroTitle: data.heroTitle ?? fallbackSiteSettings.heroTitle,
-    heroSubtitle: data.heroSubtitle ?? fallbackSiteSettings.heroSubtitle,
-    heroCtaLabel: data.heroCtaLabel ?? fallbackSiteSettings.heroCtaLabel,
-    heroMediaUrl: data.heroMediaUrl ?? fallbackSiteSettings.heroMediaUrl,
-    aboutTitle: data.aboutTitle ?? fallbackSiteSettings.aboutTitle,
+    siteName: typeof data.siteName === "string" && data.siteName.trim() ? data.siteName : base.siteName,
+    logoUrlLight: typeof data.logoUrlLight === "string" ? data.logoUrlLight : base.logoUrlLight,
+    logoUrlDark: typeof data.logoUrlDark === "string" ? data.logoUrlDark : base.logoUrlDark,
+    heroTitle: typeof data.heroTitle === "string" ? data.heroTitle : base.heroTitle,
+    heroSubtitle: typeof data.heroSubtitle === "string" ? data.heroSubtitle : base.heroSubtitle,
+    heroCtaLabel: typeof data.heroCtaLabel === "string" ? data.heroCtaLabel : base.heroCtaLabel,
+    heroMediaUrl: typeof data.heroMediaUrl === "string" ? data.heroMediaUrl : base.heroMediaUrl,
+    aboutTitle: typeof data.aboutTitle === "string" ? data.aboutTitle : base.aboutTitle,
     aboutDescription:
-      data.aboutDescription ?? fallbackSiteSettings.aboutDescription,
-    missionStatement:
-      data.missionStatement ?? fallbackSiteSettings.missionStatement,
-    values: data.values ?? fallbackSiteSettings.values,
+      typeof data.aboutDescription === "string" ? data.aboutDescription : base.aboutDescription,
+    missionStatement: typeof data.missionStatement === "string" ? data.missionStatement : base.missionStatement,
+    values: Array.isArray(data.values)
+      ? data.values.filter((value: unknown) => typeof value === "string")
+      : base.values,
     contact: {
-      ...fallbackSiteSettings.contact,
-      ...(data.contact ?? {}),
+      ...base.contact,
+      ...(typeof data.contact === "object" && data.contact !== null ? data.contact : {}),
     },
-    languages: data.languages ?? fallbackSiteSettings.languages,
+    social: {
+      ...base.social,
+      ...(typeof data.social === "object" && data.social !== null ? data.social : {}),
+    },
+    copyright: typeof data.copyright === "string" ? data.copyright : base.copyright,
+    languages: Array.isArray(data.languages)
+      ? data.languages.filter((value: unknown) => typeof value === "string")
+      : base.languages,
     defaultLanguage:
-      data.defaultLanguage ?? fallbackSiteSettings.defaultLanguage,
-    primaryColor: data.primaryColor ?? fallbackSiteSettings.primaryColor,
-    accentColor: data.accentColor ?? fallbackSiteSettings.accentColor,
+      typeof data.defaultLanguage === "string" ? data.defaultLanguage : base.defaultLanguage,
+    primaryColor: typeof data.primaryColor === "string" ? data.primaryColor : base.primaryColor,
+    accentColor: typeof data.accentColor === "string" ? data.accentColor : base.accentColor,
   };
 }
 
@@ -131,8 +154,13 @@ async function fetchSiteSettings() {
   const adminApp = getAdminApp();
   if (!adminApp) return fallbackSiteSettings;
   const db = getFirestore(adminApp);
-  const doc = await db.collection('siteSettings').doc('public').get();
-  return mapSiteSettings(doc.data());
+  const collectionRef = db.collection('siteSettings');
+  const defaultDoc = await collectionRef.doc('default').get();
+  if (defaultDoc.exists) {
+    return mapSiteSettings(defaultDoc.data());
+  }
+  const legacyDoc = await collectionRef.doc('public').get();
+  return mapSiteSettings(legacyDoc.exists ? legacyDoc.data() : undefined);
 }
 
 export const getPublicContent = cache(async (): Promise<PublicContent> => {

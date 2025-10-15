@@ -27,23 +27,18 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase/provider';
-import { collection, deleteDoc, doc, setDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, setDoc, writeBatch } from 'firebase/firestore';
 import { useMemoFirebase } from '@/firebase/firestore/use-memo-firebase';
 import { useCollection, type WithId } from '@/firebase/firestore/use-collection';
 import { requireAppCheckToken } from '@/lib/admin/app-check';
 import { useSearchPagination } from '@/hooks/use-search-pagination';
-import { Loader2, MoreHorizontal } from 'lucide-react';
+import { Loader2, Download, Upload, FileText, Pencil, Trash2, Trash } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PaginationControls } from '@/components/admin/pagination-controls';
 
@@ -72,8 +67,19 @@ export default function AdminNationalitiesPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedNationality, setSelectedNationality] = useState<Nationality | null>(null);
+  const [importText, setImportText] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+
+  // Column-based search states
+  const [nameSearch, setNameSearch] = useState('');
+  const [codeSearch, setCodeSearch] = useState('');
+
+  // Bulk selection states
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const nationalitiesCollection = useMemoFirebase(() => collection(firestore, 'nationalities'), [firestore]);
   const { data, isLoading } = useCollection(nationalitiesCollection);
@@ -82,6 +88,15 @@ export default function AdminNationalitiesPage() {
     if (!data) return [];
     return data.map(mapNationality).sort((a, b) => a.name.localeCompare(b.name));
   }, [data]);
+
+  // Apply column-based filtering
+  const filteredNationalities = useMemo(() => {
+    return nationalities.filter((nationality) => {
+      const matchesName = !nameSearch || nationality.name.toLowerCase().includes(nameSearch.toLowerCase());
+      const matchesCode = !codeSearch || (nationality.code ?? '').toLowerCase().includes(codeSearch.toLowerCase());
+      return matchesName && matchesCode;
+    });
+  }, [nationalities, nameSearch, codeSearch]);
 
   const {
     searchTerm,
@@ -94,7 +109,7 @@ export default function AdminNationalitiesPage() {
     pageCount,
     filteredCount,
   } = useSearchPagination({
-    items: nationalities,
+    items: filteredNationalities,
     filter: (nationality, term) => {
       const haystack = `${nationality.name} ${nationality.code ?? ''}`.toLowerCase();
       return haystack.includes(term);
@@ -170,6 +185,142 @@ export default function AdminNationalitiesPage() {
     }
   };
 
+  // Export to TXT file
+  const handleExportTxt = () => {
+    const content = nationalities.map((nat) => `${nat.name}${nat.code ? `\t${nat.code}` : ''}`).join('\n');
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nationalities_${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({
+      title: 'Export successful',
+      description: `${nationalities.length} nationalities exported to TXT file.`,
+    });
+  };
+
+  // Import from file
+  const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      setImportText(text);
+      setIsImportDialogOpen(true);
+    };
+    reader.readAsText(file);
+    event.target.value = ''; // Reset input
+  };
+
+  // Process import from textarea
+  const handleImport = async () => {
+    if (!importText.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Import failed',
+        description: 'Please enter data to import.',
+      });
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      await requireAppCheckToken();
+      const lines = importText.split('\n').filter((line) => line.trim());
+      const batch = writeBatch(firestore);
+      let count = 0;
+
+      for (const line of lines) {
+        const parts = line.split('\t').map((p) => p.trim());
+        if (parts[0]) {
+          const newDocRef = doc(collection(firestore, 'nationalities'));
+          batch.set(newDocRef, {
+            name: parts[0],
+            code: parts[1] || null,
+          });
+          count++;
+        }
+      }
+
+      await batch.commit();
+      toast({
+        title: 'Import successful',
+        description: `${count} nationalities imported successfully.`,
+      });
+      setIsImportDialogOpen(false);
+      setImportText('');
+    } catch (error) {
+      const description = error instanceof Error ? error.message : 'Unable to import nationalities.';
+      toast({
+        variant: 'destructive',
+        title: 'Import failed',
+        description,
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // Toggle selection for single item
+  const toggleSelection = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  // Toggle select all
+  const toggleSelectAll = () => {
+    if (selectedIds.size === paginatedItems.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedItems.map((item) => item.id)));
+    }
+  };
+
+  // Bulk delete
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+
+    const confirmed = confirm(`Are you sure you want to delete ${selectedIds.size} nationality/nationalities?`);
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+    try {
+      await requireAppCheckToken();
+      const batch = writeBatch(firestore);
+
+      selectedIds.forEach((id) => {
+        batch.delete(doc(firestore, 'nationalities', id));
+      });
+
+      await batch.commit();
+      toast({
+        title: 'Nationalities deleted',
+        description: `${selectedIds.size} nationality/nationalities deleted successfully.`,
+      });
+      setSelectedIds(new Set());
+    } catch (error) {
+      const description = error instanceof Error ? error.message : 'Unable to delete nationalities.';
+      toast({
+        variant: 'destructive',
+        title: 'Delete failed',
+        description,
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -179,7 +330,50 @@ export default function AdminNationalitiesPage() {
             Maintain a clean list of guest nationalities for finished tour diaries.
           </p>
         </div>
-        <Button onClick={openCreateDialog}>Add Nationality</Button>
+        <div className="flex flex-wrap gap-2">
+          {selectedIds.size > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleBulkDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash className="mr-2 h-4 w-4" />
+              )}
+              Delete ({selectedIds.size})
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={handleExportTxt}>
+            <Download className="mr-2 h-4 w-4" />
+            Export TXT
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => document.getElementById('import-file-nationalities')?.click()}
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Import File
+          </Button>
+          <input
+            id="import-file-nationalities"
+            type="file"
+            accept=".txt"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+          <Button variant="outline" size="sm" onClick={() => {
+            setImportText('');
+            setIsImportDialogOpen(true);
+          }}>
+            <FileText className="mr-2 h-4 w-4" />
+            Import Text
+          </Button>
+          <Button onClick={openCreateDialog}>Add Nationality</Button>
+        </div>
       </div>
 
       <Card>
@@ -213,21 +407,48 @@ export default function AdminNationalitiesPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={paginatedItems.length > 0 && selectedIds.size === paginatedItems.length}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Select all"
+                  />
+                </TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Code</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+              <TableRow>
+                <TableHead></TableHead>
+                <TableHead>
+                  <Input
+                    placeholder="Search name..."
+                    value={nameSearch}
+                    onChange={(e) => setNameSearch(e.target.value)}
+                    className="h-8"
+                  />
+                </TableHead>
+                <TableHead>
+                  <Input
+                    placeholder="Search code..."
+                    value={codeSearch}
+                    onChange={(e) => setCodeSearch(e.target.value)}
+                    className="h-8"
+                  />
+                </TableHead>
+                <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="h-24 text-center">
+                  <TableCell colSpan={4} className="h-24 text-center">
                     <Loader2 className="mx-auto h-6 w-6 animate-spin text-accent" />
                   </TableCell>
                 </TableRow>
               ) : paginatedItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
                     {filteredCount === 0 && nationalities.length > 0
                       ? 'No nationalities match your search.'
                       : 'No nationalities have been added yet.'}
@@ -235,25 +456,41 @@ export default function AdminNationalitiesPage() {
                 </TableRow>
               ) : (
                 paginatedItems.map((nationality) => (
-                  <TableRow key={nationality.id}>
+                  <TableRow
+                    key={nationality.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => openEditDialog(nationality)}
+                  >
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedIds.has(nationality.id)}
+                        onCheckedChange={() => toggleSelection(nationality.id)}
+                        aria-label={`Select ${nationality.name}`}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{nationality.name}</TableCell>
                     <TableCell>{nationality.code || '—'}</TableCell>
                     <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => openEditDialog(nationality)}>Edit</DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(nationality)}>
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => openEditDialog(nationality)}
+                          title="Edit"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => handleDelete(nationality)}
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -311,6 +548,41 @@ export default function AdminNationalitiesPage() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Import Nationalities</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground mb-2">
+                Enter one nationality per line. Format: <code className="text-xs bg-muted px-1 py-0.5 rounded">Name[TAB]Code</code>
+              </p>
+              <p className="text-xs text-muted-foreground mb-4">
+                Example:<br />
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">Australia	AU</code><br />
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">France	FR</code>
+              </p>
+              <Textarea
+                placeholder="Australia&#9;AU&#10;France&#9;FR&#10;Germany&#9;DE"
+                value={importText}
+                onChange={(e) => setImportText(e.target.value)}
+                className="min-h-[200px] font-mono text-sm"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setIsImportDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleImport} disabled={isImporting}>
+                {isImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Import
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

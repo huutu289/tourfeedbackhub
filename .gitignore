@@ -46,3 +46,4 @@ firestore-debug.log
 # Firebase artifacts
 .firebase/
 build.log
+recapcha key

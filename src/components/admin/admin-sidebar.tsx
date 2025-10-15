@@ -16,6 +16,8 @@ import {
   Languages,
   MapPinned,
   Flag,
+  Navigation,
+  LayoutTemplate,
 } from "lucide-react";
 
 import {
@@ -45,6 +47,18 @@ const menuItems = [
     icon: FileText,
     label: "Site Content",
     tooltip: "Manage About & Contact details",
+  },
+  {
+    href: "/admin/navigation",
+    icon: Navigation,
+    label: "Header Nav",
+    tooltip: "Manage header navigation",
+  },
+  {
+    href: "/admin/footer",
+    icon: LayoutTemplate,
+    label: "Footer Nav",
+    tooltip: "Manage footer navigation",
   },
   {
     href: "/admin/tour-types",

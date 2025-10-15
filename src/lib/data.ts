@@ -1,6 +1,54 @@
-import { type Tour, type Review, type SiteSettings, type TourType, type Story } from "@/lib/types";
+import {
+  type NavigationMenu,
+  type NavigationMenuItem,
+  type SiteSettings,
+  type Story,
+  type Tour,
+  type TourType,
+  type Review,
+} from "@/lib/types";
+
+function buildNavigationTree(flatItems: NavigationMenuItem[]): NavigationMenuItem[] {
+  const clonedItems = flatItems.map((item) => ({
+    ...item,
+    children: [] as NavigationMenuItem[],
+  }));
+  const byId = new Map<string, NavigationMenuItem>();
+  clonedItems.forEach((item) => byId.set(item.id, item));
+
+  const roots: NavigationMenuItem[] = [];
+
+  clonedItems.forEach((item) => {
+    if (item.parentId) {
+      const parent = byId.get(item.parentId);
+      if (parent) {
+        parent.children = parent.children ?? [];
+        parent.children.push(item);
+      } else {
+        roots.push(item);
+      }
+    } else {
+      roots.push(item);
+    }
+  });
+
+  const sortItems = (items: NavigationMenuItem[]) => {
+    items.sort((a, b) => a.order - b.order);
+    items.forEach((child) => {
+      if (child.children && child.children.length > 0) {
+        sortItems(child.children);
+      }
+    });
+  };
+
+  sortItems(roots);
+  return roots;
+}
 
 export const siteSettings: SiteSettings = {
+  siteName: "Tour Insights Hub",
+  logoUrlLight: "https://picsum.photos/seed/logo-light/320/80",
+  logoUrlDark: "https://picsum.photos/seed/logo-dark/320/80",
   heroTitle: "Share Your Journey, Shape Ours",
   heroSubtitle:
     "Your honest reflections help us refine every itinerary and craft unforgettable moments for future travellers.",
@@ -17,14 +65,19 @@ export const siteSettings: SiteSettings = {
     "Tailored, small-group attention",
   ],
   contact: {
-    email: "hello@tourfeedbackhub.com",
-    phone: "+84 912 345 678",
-    whatsapp: "https://wa.me/84912345678",
-    facebook: "https://facebook.com/tourfeedbackhub",
-    instagram: "https://instagram.com/tourfeedbackhub",
-    zalo: "https://zalo.me/0912345678",
-    location: "Da Nang, Vietnam",
+    email: "hello@example.com",
+    phone: "+84 90 812 3456",
+    whatsapp: "84908123456",
+    address: "Hue, Viet Nam",
+    mapEmbedUrl: "https://maps.google.com/?q=Hue+Vietnam",
   },
+  social: {
+    facebook: "https://facebook.com/your.page",
+    instagram: "https://instagram.com/your.profile",
+    youtube: "https://youtube.com/your-channel",
+    tiktok: "https://www.tiktok.com/@yourhandle",
+  },
+  copyright: "© 2025 Cao Hữu Tú. All rights reserved.",
   languages: ["en", "it"],
   defaultLanguage: "en",
   primaryColor: "#77B5FE",
@@ -224,6 +277,165 @@ export const reviews: Review[] = [
     createdAt: new Date("2024-04-24"),
   },
 ];
+
+const headerMenuFlatItems: NavigationMenuItem[] = [
+  { id: "header-home", label: "Home", href: "/", type: "internal", order: 10, parentId: null },
+  { id: "header-tours", label: "Tours", href: "/tours", type: "internal", order: 20, parentId: null },
+  {
+    id: "header-tours-cycling",
+    label: "Cycling Tours",
+    href: "/tours?type=cycling",
+    type: "internal",
+    order: 10,
+    parentId: "header-tours",
+  },
+  {
+    id: "header-tours-cultural",
+    label: "Cultural Tours",
+    href: "/tours?type=culture",
+    type: "internal",
+    order: 20,
+    parentId: "header-tours",
+  },
+  {
+    id: "header-tours-food",
+    label: "Food Tours",
+    href: "/tours?type=food",
+    type: "internal",
+    order: 30,
+    parentId: "header-tours",
+  },
+  { id: "header-diaries", label: "Diaries", href: "/finished-tours", type: "internal", order: 30, parentId: null },
+  { id: "header-stories", label: "Stories", href: "/stories", type: "internal", order: 40, parentId: null },
+  { id: "header-reviews", label: "Reviews", href: "/reviews", type: "internal", order: 50, parentId: null },
+  { id: "header-about", label: "About", href: "/about", type: "internal", order: 60, parentId: null },
+  { id: "header-contact", label: "Contact", href: "/contact", type: "internal", order: 70, parentId: null },
+  {
+    id: "header-cta",
+    label: "Share Your Story",
+    href: "/feedback",
+    type: "internal",
+    order: 80,
+    parentId: null,
+    target: "_self",
+    group: "cta",
+  },
+];
+
+const footerMenuFlatItems: NavigationMenuItem[] = [
+  { id: "footer-links-about", area: "links", label: "About", href: "/about", type: "internal", order: 10, parentId: null },
+  { id: "footer-links-tours", area: "links", label: "Tours", href: "/tours", type: "internal", order: 20, parentId: null },
+  { id: "footer-links-diaries", area: "links", label: "Diaries", href: "/finished-tours", type: "internal", order: 30, parentId: null },
+  { id: "footer-links-stories", area: "links", label: "Stories", href: "/stories", type: "internal", order: 40, parentId: null },
+  { id: "footer-links-reviews", area: "links", label: "Reviews", href: "/reviews", type: "internal", order: 50, parentId: null },
+  { id: "footer-legal-privacy", area: "legal", label: "Privacy Policy", href: "/privacy", type: "internal", order: 10, parentId: null },
+  { id: "footer-legal-terms", area: "legal", label: "Terms of Service", href: "/terms", type: "internal", order: 20, parentId: null },
+  {
+    id: "footer-social-facebook",
+    area: "social",
+    label: "Facebook",
+    href: "https://facebook.com/tourfeedbackhub",
+    type: "external",
+    order: 10,
+    parentId: null,
+    icon: "Facebook",
+    target: "_blank",
+  },
+  {
+    id: "footer-social-instagram",
+    area: "social",
+    label: "Instagram",
+    href: "https://instagram.com/tourfeedbackhub",
+    type: "external",
+    order: 20,
+    parentId: null,
+    icon: "Instagram",
+    target: "_blank",
+  },
+  {
+    id: "footer-social-youtube",
+    area: "social",
+    label: "YouTube",
+    href: "https://youtube.com/@tourfeedbackhub",
+    type: "external",
+    order: 30,
+    parentId: null,
+    icon: "Youtube",
+    target: "_blank",
+  },
+  {
+    id: "footer-contact-email",
+    area: "contact",
+    label: "Email",
+    href: "mailto:hello@tourfeedbackhub.com",
+    type: "external",
+    order: 10,
+    parentId: null,
+    icon: "Mail",
+  },
+  {
+    id: "footer-contact-phone",
+    area: "contact",
+    label: "Phone",
+    href: "tel:+84912345678",
+    type: "external",
+    order: 20,
+    parentId: null,
+    icon: "Phone",
+  },
+  {
+    id: "footer-contact-address",
+    area: "contact",
+    label: "Address",
+    href: "/contact#map",
+    type: "hash",
+    order: 30,
+    parentId: null,
+    icon: "MapPin",
+  },
+  {
+    id: "footer-cta-share",
+    area: "cta",
+    label: "Share Your Story",
+    href: "/reviews/new",
+    type: "internal",
+    order: 10,
+    parentId: null,
+    target: "_self",
+  },
+  {
+    id: "footer-cta-review",
+    area: "cta",
+    label: "Leave a Review",
+    href: "/reviews/new",
+    type: "internal",
+    order: 20,
+    parentId: null,
+    target: "_self",
+  },
+];
+
+export const headerNavigationMenu: NavigationMenu = {
+  id: "fallback-header",
+  key: "header",
+  locale: "en",
+  title: "Main Header",
+  published: true,
+  updatedAt: new Date(),
+  items: buildNavigationTree(headerMenuFlatItems),
+  flatItems: headerMenuFlatItems,
+};
+
+export const footerNavigationMenu: NavigationMenu = {
+  id: "fallback-footer",
+  key: "footer",
+  locale: "en",
+  title: "Main Footer",
+  published: true,
+  updatedAt: new Date(),
+  items: buildNavigationTree(footerMenuFlatItems),
+  flatItems: footerMenuFlatItems,
+};
 
 export const countries = [
   { name: "United States", code: "US" },

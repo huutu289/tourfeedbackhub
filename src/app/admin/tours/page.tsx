@@ -34,6 +34,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -47,13 +48,13 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PaginationControls } from '@/components/admin/pagination-controls';
-import { Loader2, MoreHorizontal } from 'lucide-react';
+import { Loader2, MoreHorizontal, Download, Upload, FileText, Pencil, Trash2, Trash } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase/provider';
-import { collection, deleteDoc, doc, setDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, setDoc, writeBatch } from 'firebase/firestore';
 import { useMemoFirebase } from '@/firebase/firestore/use-memo-firebase';
 import { useCollection, type WithId } from '@/firebase/firestore/use-collection';
 import type { Tour } from '@/lib/types';
@@ -79,6 +80,7 @@ const tourSchema = z.object({
   itinerary: z.string().min(1, 'Detailed itinerary is required'),
   guideId: z.string().optional(),
   guideLanguageIds: z.array(z.string()).min(1, 'Select at least one language'),
+  tourTypeIds: z.array(z.string()).min(1, 'Select at least one tour type'),
 });
 
 type TourFormValues = z.infer<typeof tourSchema>;
@@ -158,16 +160,29 @@ export default function AdminFinishedToursPage() {
   const [tourToDelete, setTourToDelete] = useState<WithId<Tour> | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const mediaFileInputRef = useRef<HTMLInputElement>(null);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+
+  // Column-based search states
+  const [codeSearch, setCodeSearch] = useState('');
+  const [nameSearch, setNameSearch] = useState('');
+
+  // Bulk selection states
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   const toursCollection = useMemoFirebase(() => collection(firestore, 'tours'), [firestore]);
   const guidesCollection = useMemoFirebase(() => collection(firestore, 'guides'), [firestore]);
   const languagesCollection = useMemoFirebase(() => collection(firestore, 'languages'), [firestore]);
   const nationalitiesCollection = useMemoFirebase(() => collection(firestore, 'nationalities'), [firestore]);
+  const tourTypesCollection = useMemoFirebase(() => collection(firestore, 'tourTypes'), [firestore]);
 
   const { data, isLoading } = useCollection(toursCollection);
   const { data: guideDocs } = useCollection(guidesCollection);
   const { data: languageDocs } = useCollection(languagesCollection);
   const { data: nationalityDocs } = useCollection(nationalitiesCollection);
+  const { data: tourTypeDocs } = useCollection(tourTypesCollection);
 
   const guides: GuideRecord[] = useMemo(() => {
     if (!guideDocs) return [];
@@ -211,10 +226,18 @@ export default function AdminFinishedToursPage() {
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [nationalityDocs]);
 
+  const tourTypeOptions = useMemo<MultiSelectOption[]>(() => {
+    if (!tourTypeDocs) return [];
+    return tourTypeDocs
+      .map((doc) => ({ value: doc.id, label: doc.title ?? doc.name ?? doc.id, order: doc.order }))
+      .sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+  }, [tourTypeDocs]);
+
   const languageLabelMap = useMemo(() => new Map(languageOptions.map((option) => [option.value, option.label])), [languageOptions]);
   const provinceLabelMap = useMemo(() => new Map(provinceOptions.map((option) => [option.value, option.label])), [provinceOptions]);
   const nationalityLabelMap = useMemo(() => new Map(nationalityOptions.map((option) => [option.value, option.label])), [nationalityOptions]);
   const guideLabelMap = useMemo(() => new Map(guideOptions.map((option) => [option.value, option.label])), [guideOptions]);
+  const tourTypeLabelMap = useMemo(() => new Map(tourTypeOptions.map((option) => [option.value, option.label])), [tourTypeOptions]);
 
   const tours = useMemo(() => {
     if (!data) return [];
@@ -223,6 +246,14 @@ export default function AdminFinishedToursPage() {
       .filter((tour) => tour.status === FINISHED_TOUR_STATUS)
       .sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
   }, [data]);
+
+  const filteredTours = useMemo(() => {
+    return tours.filter((tour) => {
+      const matchesCode = !codeSearch || tour.code.toLowerCase().includes(codeSearch.toLowerCase());
+      const matchesName = !nameSearch || tour.name.toLowerCase().includes(nameSearch.toLowerCase());
+      return matchesCode && matchesName;
+    });
+  }, [tours, codeSearch, nameSearch]);
 
   const {
     searchTerm,
@@ -235,7 +266,7 @@ export default function AdminFinishedToursPage() {
     pageCount,
     filteredCount,
   } = useSearchPagination({
-    items: tours,
+    items: filteredTours,
     filter: (tour, term) => {
       const haystack = `${tour.code} ${tour.name} ${tour.guideName} ${tour.summary}`.toLowerCase();
       return haystack.includes(term);
@@ -258,6 +289,7 @@ export default function AdminFinishedToursPage() {
       itinerary: '',
       guideId: undefined,
       guideLanguageIds: [],
+      tourTypeIds: [],
     },
   });
 
@@ -297,6 +329,7 @@ export default function AdminFinishedToursPage() {
       itinerary: '',
       guideId: undefined,
       guideLanguageIds: [],
+      tourTypeIds: [],
     });
     resetMediaInput();
     setIsDialogOpen(true);
@@ -319,6 +352,7 @@ export default function AdminFinishedToursPage() {
       ? tour.clientNationalityIds
       : matchNamesToIds(tour.clientNationalities ?? [], nationalityOptions);
     const guideId = tour.guideId ?? (tour.guideName ? matchByName(tour.guideName) : undefined);
+    const tourTypeIds = tour.tourTypeIds ?? [];
 
     form.reset({
       code: tour.code,
@@ -334,6 +368,7 @@ export default function AdminFinishedToursPage() {
       itinerary: tour.itinerary,
       guideId,
       guideLanguageIds: languageIds,
+      tourTypeIds,
     });
     resetMediaInput();
     setIsDialogOpen(true);
@@ -353,15 +388,26 @@ export default function AdminFinishedToursPage() {
       const newVideoUrls: string[] = [];
 
       if (mediaFiles && mediaFiles.length > 0) {
-        const uploads = Array.from(mediaFiles).map(async (file) => {
-          const url = await uploadTourMedia(id, file);
-          if (file.type.startsWith('video/')) {
-            newVideoUrls.push(url);
-          } else {
-            newPhotoUrls.push(url);
-          }
-        });
-        await Promise.all(uploads);
+        try {
+          const uploads = Array.from(mediaFiles).map(async (file) => {
+            console.log(`Uploading file: ${file.name}, type: ${file.type}, size: ${file.size}`);
+            const url = await uploadTourMedia(id, file);
+            console.log(`Upload successful: ${file.name} -> ${url}`);
+            if (file.type.startsWith('video/')) {
+              newVideoUrls.push(url);
+            } else {
+              newPhotoUrls.push(url);
+            }
+          });
+          await Promise.all(uploads);
+        } catch (uploadError) {
+          console.error('File upload error:', uploadError);
+          throw new Error(
+            uploadError instanceof Error
+              ? `Upload failed: ${uploadError.message}`
+              : 'Upload failed due to an unknown error'
+          );
+        }
       }
 
       const languageNames = values.guideLanguageIds
@@ -398,7 +444,7 @@ export default function AdminFinishedToursPage() {
         itinerary: values.itinerary.trim(),
         photoUrls: [...existingPhotos, ...newPhotoUrls],
         videoUrls: [...existingVideos, ...newVideoUrls],
-        tourTypeIds: selectedTour?.tourTypeIds,
+        tourTypeIds: values.tourTypeIds,
         guideId,
         guideName,
         guideLanguages: languageNames,
@@ -495,6 +541,154 @@ export default function AdminFinishedToursPage() {
     return `${year}-${month}-${day}`;
   };
 
+  // Export to TXT file
+  const handleExportTxt = () => {
+    const content = tours.map((tour) =>
+      `${tour.code}\t${tour.name}\t${formatDateInput(tour.startDate)}\t${formatDateInput(tour.endDate)}\t${tour.clientCount}\t${tour.clientCountry}\t${tour.clientCity}\t${tour.guideName || ''}`
+    ).join('\n');
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tours_${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({
+      title: 'Export successful',
+      description: `${tours.length} tours exported to TXT file.`,
+    });
+  };
+
+  // Import from file
+  const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      setImportText(text);
+      setIsImportDialogOpen(true);
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  };
+
+  // Process import (simplified - basic fields only)
+  const handleImport = async () => {
+    if (!importText.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Import failed',
+        description: 'Please enter data to import.',
+      });
+      return;
+    }
+    setIsImporting(true);
+    try {
+      await requireAppCheckToken();
+      const lines = importText.split('\n').filter((line) => line.trim());
+      const batch = writeBatch(firestore);
+      let count = 0;
+      for (const line of lines) {
+        const parts = line.split('\t').map((p) => p.trim());
+        if (parts[0] && parts[1]) {
+          const newDocRef = doc(collection(firestore, 'tours'));
+          batch.set(newDocRef, {
+            id: newDocRef.id,
+            code: parts[0],
+            name: parts[1],
+            summary: '',
+            startDate: parts[2] ? new Date(parts[2]) : new Date(),
+            endDate: parts[3] ? new Date(parts[3]) : new Date(),
+            clientCount: parts[4] ? Number(parts[4]) : 1,
+            clientNationalities: [],
+            clientNationalityIds: [],
+            clientCountry: parts[5] || '',
+            clientCity: parts[6] || '',
+            provinces: [],
+            provinceIds: [],
+            itinerary: '',
+            photoUrls: [],
+            videoUrls: [],
+            guideName: parts[7] || '',
+            guideLanguages: [],
+            guideLanguageIds: [],
+            status: FINISHED_TOUR_STATUS,
+          });
+          count++;
+        }
+      }
+      await batch.commit();
+      toast({
+        title: 'Import successful',
+        description: `${count} tours imported successfully.`,
+      });
+      setIsImportDialogOpen(false);
+      setImportText('');
+    } catch (error) {
+      const description = error instanceof Error ? error.message : 'Unable to import tours.';
+      toast({
+        variant: 'destructive',
+        title: 'Import failed',
+        description,
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // Toggle selection
+  const toggleSelection = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  // Toggle select all
+  const toggleSelectAll = () => {
+    if (selectedIds.size === paginatedItems.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedItems.map((item) => item.id)));
+    }
+  };
+
+  // Bulk delete
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    const confirmed = confirm(`Are you sure you want to delete ${selectedIds.size} tour(s)?`);
+    if (!confirmed) return;
+    setIsBulkDeleting(true);
+    try {
+      await requireAppCheckToken();
+      const batch = writeBatch(firestore);
+      selectedIds.forEach((id) => {
+        batch.delete(doc(firestore, 'tours', id));
+      });
+      await batch.commit();
+      toast({
+        title: 'Tours deleted',
+        description: `${selectedIds.size} tour(s) deleted successfully.`,
+      });
+      setSelectedIds(new Set());
+    } catch (error) {
+      const description = error instanceof Error ? error.message : 'Unable to delete tours.';
+      toast({
+        variant: 'destructive',
+        title: 'Delete failed',
+        description,
+      });
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
   return (
     <>
       <div className="space-y-8">
@@ -505,7 +699,50 @@ export default function AdminFinishedToursPage() {
               Chronicle completed journeys and share them with future travellers.
             </p>
           </div>
-          <Button onClick={handleAddTour}>Add Finished Tour</Button>
+          <div className="flex flex-wrap gap-2">
+            {selectedIds.size > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleBulkDelete}
+                disabled={isBulkDeleting}
+              >
+                {isBulkDeleting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash className="mr-2 h-4 w-4" />
+                )}
+                Delete ({selectedIds.size})
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={handleExportTxt}>
+              <Download className="mr-2 h-4 w-4" />
+              Export TXT
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => document.getElementById('import-file-tours')?.click()}
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Import File
+            </Button>
+            <input
+              id="import-file-tours"
+              type="file"
+              accept=".txt"
+              className="hidden"
+              onChange={handleImportFile}
+            />
+            <Button variant="outline" size="sm" onClick={() => {
+              setImportText('');
+              setIsImportDialogOpen(true);
+            }}>
+              <FileText className="mr-2 h-4 w-4" />
+              Import Text
+            </Button>
+            <Button onClick={handleAddTour}>Add Finished Tour</Button>
+          </div>
         </div>
 
         <Card>
@@ -539,25 +776,58 @@ export default function AdminFinishedToursPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={paginatedItems.length > 0 && selectedIds.size === paginatedItems.length}
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="Select all"
+                    />
+                  </TableHead>
                   <TableHead>Code</TableHead>
                   <TableHead>Title</TableHead>
+                  <TableHead>Tour Types</TableHead>
                   <TableHead>Dates</TableHead>
                   <TableHead>Guide</TableHead>
                   <TableHead>Languages</TableHead>
                   <TableHead>Guests</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
+                <TableRow>
+                  <TableHead></TableHead>
+                  <TableHead>
+                    <Input
+                      placeholder="Search code..."
+                      value={codeSearch}
+                      onChange={(e) => setCodeSearch(e.target.value)}
+                      className="h-8"
+                    />
+                  </TableHead>
+                  <TableHead>
+                    <Input
+                      placeholder="Search title..."
+                      value={nameSearch}
+                      onChange={(e) => setNameSearch(e.target.value)}
+                      className="h-8"
+                    />
+                  </TableHead>
+                  <TableHead></TableHead>
+                  <TableHead></TableHead>
+                  <TableHead></TableHead>
+                  <TableHead></TableHead>
+                  <TableHead></TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center">
+                    <TableCell colSpan={9} className="h-24 text-center">
                       <Loader2 className="mx-auto h-6 w-6 animate-spin text-accent" />
                     </TableCell>
                   </TableRow>
                 ) : paginatedItems.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
                       {filteredCount === 0 && tours.length > 0
                         ? 'No finished tours match your search.'
                         : 'No finished tours have been created yet.'}
@@ -565,9 +835,23 @@ export default function AdminFinishedToursPage() {
                   </TableRow>
                 ) : (
                   paginatedItems.map((tour) => (
-                    <TableRow key={tour.id}>
+                    <TableRow
+                      key={tour.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => handleEditTour(tour)}
+                    >
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedIds.has(tour.id)}
+                          onCheckedChange={() => toggleSelection(tour.id)}
+                          aria-label={`Select ${tour.code}`}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">{tour.code}</TableCell>
                       <TableCell>{tour.name}</TableCell>
+                      <TableCell>
+                        {tour.tourTypeIds?.map(id => tourTypeLabelMap.get(id)).filter(Boolean).join(', ') || '—'}
+                      </TableCell>
                       <TableCell>
                         {tour.startDate.toLocaleDateString()} — {tour.endDate.toLocaleDateString()}
                       </TableCell>
@@ -575,25 +859,26 @@ export default function AdminFinishedToursPage() {
                       <TableCell>{tour.guideLanguages.join(', ') || '—'}</TableCell>
                       <TableCell>{tour.clientCount}</TableCell>
                       <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <span className="sr-only">Open menu</span>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => handleEditTour(tour)}>Edit</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDuplicate(tour)}>Duplicate</DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={() => setTourToDelete(tour)}
-                            >
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleEditTour(tour)}
+                            title="Edit"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => setTourToDelete(tour)}
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -796,6 +1081,27 @@ export default function AdminFinishedToursPage() {
 
               <FormField
                 control={form.control}
+                name="tourTypeIds"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tour Types</FormLabel>
+                    <FormControl>
+                      <MultiSelect
+                        options={tourTypeOptions}
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Select tour types"
+                        searchPlaceholder="Search tour types…"
+                        emptyMessage="No tour types found."
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="itinerary"
                 render={({ field }) => (
                   <FormItem>
@@ -868,20 +1174,39 @@ export default function AdminFinishedToursPage() {
                 <div className="space-y-3">
                   {selectedTour.photoUrls.length > 0 && (
                     <div>
-                      <h4 className="text-sm font-semibold mb-2">Current Photos</h4>
+                      <h4 className="text-sm font-semibold mb-2">Current Photos ({selectedTour.photoUrls.length})</h4>
                       <div className="flex flex-wrap gap-3">
-                        {selectedTour.photoUrls.map((url) => (
-                          <Image key={url} src={url} alt="Tour photo" width={120} height={90} className="rounded-md object-cover" />
+                        {selectedTour.photoUrls.map((url, index) => (
+                          <div key={`${selectedTour.id}-photo-${index}`} className="relative">
+                            {/* Use regular img tag to avoid Next.js Image Optimization issues with Firebase Storage */}
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={url}
+                              alt={`Tour photo ${index + 1}`}
+                              width={120}
+                              height={90}
+                              className="rounded-md object-cover border border-gray-200 bg-gray-100"
+                              loading="eager"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                const parent = target.parentElement;
+                                if (parent) {
+                                  parent.innerHTML = `<div class="w-[120px] h-[90px] rounded-md border border-red-300 bg-red-50 flex items-center justify-center text-xs text-red-600">Failed to load</div>`;
+                                }
+                              }}
+                            />
+                          </div>
                         ))}
                       </div>
                     </div>
                   )}
                   {selectedTour.videoUrls.length > 0 && (
                     <div>
-                      <h4 className="text-sm font-semibold mb-2">Current Videos</h4>
+                      <h4 className="text-sm font-semibold mb-2">Current Videos ({selectedTour.videoUrls.length})</h4>
                       <div className="flex flex-wrap gap-3">
-                        {selectedTour.videoUrls.map((url) => (
-                          <video key={url} controls className="h-24 rounded-md bg-black">
+                        {selectedTour.videoUrls.map((url, index) => (
+                          <video key={`${selectedTour.id}-video-${index}`} controls className="h-24 rounded-md bg-black border border-gray-200">
                             <source src={url} />
                           </video>
                         ))}
@@ -933,6 +1258,34 @@ export default function AdminFinishedToursPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Import Tours</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground mb-2">
+                Enter one tour per line. Format: <code className="text-xs bg-muted px-1 py-0.5 rounded">Code[TAB]Name[TAB]StartDate[TAB]EndDate[TAB]ClientCount[TAB]Country[TAB]City[TAB]Guide</code>
+              </p>
+              <Textarea
+                placeholder="FT-001&#9;Amazing Vietnam Tour&#9;2025-01-15&#9;2025-01-20&#9;4&#9;Australia&#9;Sydney&#9;John Doe"
+                value={importText}
+                onChange={(e) => setImportText(e.target.value)}
+                className="min-h-[200px] font-mono text-sm"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setIsImportDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleImport} disabled={isImporting}>
+                {isImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Import
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

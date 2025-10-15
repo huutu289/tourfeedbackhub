@@ -18,3 +18,4 @@ export { feedbackUploadComplete } from "./feedback-upload-complete";
 export { adminFeedbackApprove } from "./admin-feedback-approve";
 export { adminFeedbackReject } from "./admin-feedback-reject";
 export { adminTourUploadUrl } from "./admin-tour-upload-url";
+export { adminTourUploadDirect } from "./admin-tour-upload-direct";

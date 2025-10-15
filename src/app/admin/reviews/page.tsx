@@ -217,24 +217,6 @@ export default function AdminReviewsPage() {
     },
   });
 
-  const handleAdd = () => {
-    setSelectedReview(null);
-    form.reset({
-      authorDisplay: "",
-      country: "",
-      language: "en",
-      rating: 5,
-      message: "",
-      tourName: "",
-      tourId: "",
-      status: "pending",
-      summary: "",
-      createdAt: formatDateInput(new Date()),
-      photoUrls: "",
-    });
-    setIsDialogOpen(true);
-  };
-
   const handleEdit = (review: WithId<Review>) => {
     setSelectedReview(review);
     form.reset({
@@ -254,11 +236,12 @@ export default function AdminReviewsPage() {
   };
 
   const onSubmit = async (values: ReviewFormValues) => {
+    if (!selectedReview) return;
+
     setIsSubmitting(true);
     try {
       await requireAppCheckToken();
-      const id = selectedReview ? selectedReview.id : doc(collection(firestore, "reviews")).id;
-      const reviewRef = doc(firestore, "reviews", id);
+      const reviewRef = doc(firestore, "reviews", selectedReview.id);
 
       const authorDisplay = values.authorDisplay.trim();
       const country = cleanString(values.country) ?? "";
@@ -273,7 +256,6 @@ export default function AdminReviewsPage() {
       const photoUrls = parsePhotoUrls(values.photoUrls);
 
       const writeData: Record<string, unknown> = {
-        id,
         authorDisplay,
         country,
         language,
@@ -310,8 +292,8 @@ export default function AdminReviewsPage() {
       await setDoc(reviewRef, writeData, { merge: true });
 
       toast({
-        title: selectedReview ? "Review updated" : "Review created",
-        description: `"${authorDisplay}" review saved.`,
+        title: "Review updated",
+        description: `"${authorDisplay}" review has been updated.`,
       });
       setIsDialogOpen(false);
     } catch (error) {
@@ -324,36 +306,6 @@ export default function AdminReviewsPage() {
       });
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleDuplicate = async (review: WithId<Review>) => {
-    try {
-      await requireAppCheckToken();
-      const newId = doc(collection(firestore, "reviews")).id;
-      const payload: Review = {
-        ...review,
-        id: newId,
-        authorDisplay: `${review.authorDisplay} (Copy)`,
-        status: "pending",
-        createdAt: new Date(),
-      };
-      await setDoc(doc(firestore, "reviews", newId), {
-        ...payload,
-        createdAt: Timestamp.fromDate(payload.createdAt),
-      });
-      toast({
-        title: "Review duplicated",
-        description: `"${review.authorDisplay}" copied as pending.`,
-      });
-    } catch (error) {
-      const description =
-        error instanceof Error ? error.message : "Unable to duplicate review.";
-      toast({
-        variant: "destructive",
-        title: "Duplicate failed",
-        description,
-      });
     }
   };
 
@@ -416,10 +368,9 @@ export default function AdminReviewsPage() {
         <div>
           <h1 className="text-3xl font-headline font-bold">Reviews</h1>
           <p className="text-muted-foreground">
-            Approve and curate the reviews that appear on the public site.
+            Filter, approve, or reject visitor feedback from the public site, Google Reviews, TripAdvisor, and other sources.
           </p>
         </div>
-        <Button onClick={handleAdd}>Add Review</Button>
       </div>
 
       <Card>
@@ -536,9 +487,6 @@ export default function AdminReviewsPage() {
                           <DropdownMenuItem onClick={() => handleEdit(review)}>
                             Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDuplicate(review)}>
-                            Duplicate
-                          </DropdownMenuItem>
                           <DropdownMenuItem
                             disabled={review.status === "approved" || isStatusUpdating(review.id, "approved")}
                             onClick={() => updateStatus(review, "approved")}
@@ -585,7 +533,7 @@ export default function AdminReviewsPage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{selectedReview ? "Edit Review" : "Add Review"}</DialogTitle>
+            <DialogTitle>Edit Review</DialogTitle>
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

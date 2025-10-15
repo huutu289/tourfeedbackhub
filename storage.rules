@@ -17,16 +17,22 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // Helper function to check if user is admin
+    // Helper function to check if user is admin (using custom claims)
     function isAdmin() {
       return request.auth != null &&
-             exists(/databases/(default)/documents/admins/$(request.auth.uid));
+             request.auth.token.admin == true;
     }
 
     // Helper function to validate image files
     function isValidImage() {
-      return request.resource.size < 5 * 1024 * 1024 // 5MB max
-             && request.resource.contentType.matches('image/(jpeg|png|webp|heic)');
+      return request.resource.size < 10 * 1024 * 1024 // 10MB max
+             && request.resource.contentType.matches('image/(jpeg|png|webp|heic|jpg)');
+    }
+
+    // Helper function to validate video files
+    function isValidVideo() {
+      return request.resource.size < 100 * 1024 * 1024 // 100MB max
+             && request.resource.contentType.matches('video/(mp4|quicktime|x-msvideo|webm)');
     }
 
     /**

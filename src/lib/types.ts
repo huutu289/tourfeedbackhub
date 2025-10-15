@@ -106,12 +106,24 @@ export interface ContactInfo {
   phone?: string;
   whatsapp?: string;
   zalo?: string;
-  facebook?: string;
-  instagram?: string;
+  address?: string;
+  mapEmbedUrl?: string;
   location?: string;
 }
 
+export interface SocialLinks {
+  facebook?: string;
+  instagram?: string;
+  youtube?: string;
+  tiktok?: string;
+  whatsapp?: string;
+  zalo?: string;
+}
+
 export interface SiteSettings {
+  siteName: string;
+  logoUrlLight?: string;
+  logoUrlDark?: string;
   heroTitle: string;
   heroSubtitle: string;
   heroCtaLabel: string;
@@ -121,6 +133,8 @@ export interface SiteSettings {
   missionStatement?: string;
   values?: string[];
   contact: ContactInfo;
+  social: SocialLinks;
+  copyright?: string;
   languages: string[];
   defaultLanguage: string;
   primaryColor?: string;
@@ -133,4 +147,44 @@ export interface PublicContent {
   tours: Tour[];
   stories: Story[];
   reviews: Review[];
+}
+
+export type NavigationMenuKey = 'header' | 'footer';
+
+export type NavigationItemType = 'internal' | 'external' | 'hash';
+
+export type NavigationAudience = 'guest' | 'user' | 'admin';
+
+export interface NavigationBadge {
+  text: string;
+  color?: string;
+}
+
+export type NavigationArea = 'links' | 'legal' | 'social' | 'contact' | 'cta';
+
+export interface NavigationMenuItem {
+  id: string;
+  label: string;
+  href: string;
+  type: NavigationItemType;
+  order: number;
+  parentId?: string | null;
+  icon?: string;
+  target?: '_self' | '_blank';
+  visibleFor?: NavigationAudience[];
+  badge?: NavigationBadge;
+  area?: NavigationArea;
+  group?: string;
+  children?: NavigationMenuItem[];
+}
+
+export interface NavigationMenu {
+  id: string;
+  key: NavigationMenuKey;
+  locale?: string | null;
+  title?: string;
+  published: boolean;
+  updatedAt?: Date;
+  items: NavigationMenuItem[];
+  flatItems?: NavigationMenuItem[];
 }
