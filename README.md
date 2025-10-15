@@ -2,6 +2,16 @@
 
 Đây là một ứng dụng Next.js được xây dựng bằng Firebase Studio. Nó là một nền tảng để thu thập và hiển thị phản hồi của người dùng cho các chuyến tham quan khác nhau.
 
+## Tính năng chính
+
+- 🎫 **Quản lý Tour**: Tạo, chỉnh sửa và quản lý thông tin các chuyến tour đã hoàn thành
+- 📸 **Upload Media**: Hỗ trợ upload hình ảnh (lên đến 10MB) và video (lên đến 100MB)
+- ⭐ **Thu thập đánh giá**: Cho phép khách hàng gửi đánh giá và phản hồi với AI tóm tắt
+- 🔐 **Xác thực Admin**: Hệ thống đăng nhập với Custom Claims và Remember Me
+- 🖼️ **Hiển thị Media**: Tự động tạo URL công khai với token-based access control
+- 🛡️ **App Check**: Bảo vệ Cloud Functions và Firestore khỏi spam và lạm dụng
+- 🎨 **Giao diện hiện đại**: Sử dụng ShadCN UI components với Tailwind CSS
+
 Để bắt đầu, hãy xem `src/app/page.tsx`.
 
 ## Công nghệ sử dụng
@@ -36,3 +46,100 @@ Sao chép `.env.example` (nếu có) hoặc đặt trực tiếp trong Firebase 
 | `NEXT_PUBLIC_TRIPADVISOR_WIDGET_URL` | (Tùy chọn) URL iframe Tripadvisor |
 | `NEXT_PUBLIC_GOOGLE_REVIEWS_WIDGET_URL` | (Tùy chọn) URL iframe Google Reviews |
 | `NEXT_PUBLIC_SITE_URL` | Canonical URL (ví dụ `https://tourfeedbackhub.com`) |
+
+## Cài đặt và Chạy
+
+```bash
+# Cài đặt dependencies
+npm install
+
+# Chạy development server
+npm run dev
+
+# Build production
+npm run build
+
+# Chạy production server
+npm start
+```
+
+Server sẽ chạy tại `http://localhost:9002`
+
+## Upload Media cho Tour
+
+Ứng dụng hỗ trợ upload hình ảnh và video cho các tour với cơ chế token-based access control:
+
+### Cách thức hoạt động:
+
+1. **Upload nhỏ (< 8MB)**: Sử dụng base64 encoding và Cloud Function `adminTourUploadDirect`
+2. **Upload lớn (>= 8MB)**: Sử dụng signed URL từ Cloud Function `adminTourUploadUrl`
+
+### Định dạng hỗ trợ:
+
+- **Hình ảnh**: JPEG, PNG, WebP, HEIC (tối đa 10MB)
+- **Video**: MP4, QuickTime, WebM (tối đa 100MB)
+
+### Storage Rules:
+
+Các file được lưu tại đường dẫn `/tours/{tourId}/` trong Firebase Storage và tự động được gán public download token để cho phép truy cập công khai mà không cần authentication.
+
+## Xác thực Admin
+
+### Đăng nhập:
+
+- Truy cập `/admin/login`
+- Sử dụng email và password
+- Chọn "Remember Me" để lưu trạng thái đăng nhập
+
+### Phân quyền:
+
+Admin được xác định thông qua Custom Claims (`admin: true`). Để cấp quyền admin cho user:
+
+```javascript
+// Sử dụng Firebase Admin SDK
+await admin.auth().setCustomUserClaims(uid, { admin: true });
+```
+
+## Cloud Functions
+
+Dự án sử dụng Firebase Cloud Functions Gen 2:
+
+- `feedbackSubmit`: Xử lý feedback từ khách hàng
+- `feedbackUploadComplete`: Xác nhận hoàn tất upload feedback photo
+- `adminFeedbackApprove`: Phê duyệt feedback
+- `adminFeedbackReject`: Từ chối feedback
+- `adminTourUploadDirect`: Upload media trực tiếp (base64)
+- `adminTourUploadUrl`: Tạo signed URL cho upload lớn
+
+### Deploy Functions:
+
+```bash
+cd functions
+npm run build
+firebase deploy --only functions
+```
+
+## Firestore Security Rules
+
+Để deploy Firestore và Storage rules:
+
+```bash
+# Deploy cả hai
+firebase deploy --only firestore:rules,storage
+
+# Hoặc riêng lẻ
+firebase deploy --only firestore:rules
+firebase deploy --only storage
+```
+
+## Genkit AI
+
+Dự án sử dụng Genkit với Google AI (Gemini 2.5 Flash) để:
+
+- Tóm tắt feedback của khách hàng
+- Phát hiện ngôn ngữ feedback
+
+```bash
+# Chạy Genkit dev server
+npm run genkit:dev
+```
