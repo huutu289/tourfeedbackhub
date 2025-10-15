@@ -21,11 +21,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    match /site_settings/{siteSettingsId} {
+    match /siteSettings/{siteSettingsId} {
       allow read, write: if true;
     }
 
-    match /tour_types/{tourTypeId} {
+    match /tourTypes/{tourTypeId} {
       allow read, write: if true;
     }
 
@@ -34,6 +34,30 @@ service cloud.firestore {
     }
 
     match /feedback/{feedbackId} {
+      allow read, write: if true;
+    }
+
+    match /stories/{storyId} {
+      allow read, write: if true;
+    }
+
+    match /reviews/{reviewId} {
+      allow read, write: if true;
+    }
+
+    match /guides/{guideId} {
+      allow read, write: if true;
+    }
+
+    match /languages/{languageId} {
+      allow read, write: if true;
+    }
+
+    match /provinces/{provinceId} {
+      allow read, write: if true;
+    }
+
+    match /nationalities/{nationalityId} {
       allow read, write: if true;
     }
   }

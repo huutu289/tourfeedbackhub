@@ -1,4 +1,7 @@
+'use client';
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { MessageSquare, Facebook, Instagram, Mail, Phone, MessageCircle } from "lucide-react";
 import type { ContactInfo } from "@/lib/types";
 
@@ -7,6 +10,12 @@ interface FooterProps {
 }
 
 export default function Footer({ contact }: FooterProps) {
+  const pathname = usePathname();
+
+  if (pathname.startsWith("/admin")) {
+    return null;
+  }
+
   return (
     <footer className="bg-secondary/50 border-t">
       <div className="container mx-auto px-4 py-8">

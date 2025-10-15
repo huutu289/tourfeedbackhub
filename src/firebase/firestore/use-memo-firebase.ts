@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, type DependencyList } from "react";
+import { useRef, type DependencyList } from "react";
 
 type MemoFirebase<T> = T & { __memo?: boolean };
 
@@ -8,11 +8,22 @@ export function useMemoFirebase<T>(
   factory: () => T,
   deps: DependencyList
 ): T | MemoFirebase<T> {
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const memoized = useMemo(factory, deps);
+  const valueRef = useRef<T | MemoFirebase<T>>();
+  const depsRef = useRef<DependencyList>();
 
-  if (typeof memoized !== "object" || memoized === null) return memoized;
-  (memoized as MemoFirebase<T>).__memo = true;
+  const hasChanged =
+    !depsRef.current ||
+    depsRef.current.length !== deps.length ||
+    deps.some((dependency, index) => !Object.is(dependency, depsRef.current![index]));
 
-  return memoized;
+  if (hasChanged) {
+    const nextValue = factory();
+    if (typeof nextValue === "object" && nextValue !== null) {
+      (nextValue as MemoFirebase<T>).__memo = true;
+    }
+    valueRef.current = nextValue;
+    depsRef.current = deps;
+  }
+
+  return valueRef.current as T | MemoFirebase<T>;
 }

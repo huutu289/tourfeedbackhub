@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
+import { Playfair_Display, PT_Sans } from 'next/font/google';
 import './globals.css';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/toaster';
@@ -7,6 +8,20 @@ import Header from '@/components/header';
 import Footer from '@/components/footer';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { getSiteSettings } from '@/lib/content-service';
+
+const playfair = Playfair_Display({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  variable: '--font-headline',
+  display: 'swap',
+});
+
+const ptSans = PT_Sans({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  variable: '--font-body',
+  display: 'swap',
+});
 
 const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 const searchConsoleVerification = process.env.NEXT_PUBLIC_SEARCH_CONSOLE_VERIFICATION;
@@ -47,17 +62,17 @@ export default async function RootLayout({
   return (
     <html lang={siteSettings.defaultLanguage} suppressHydrationWarning>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=PT+Sans:wght@400;700&display=swap"
-          rel="stylesheet"
-        />
         {searchConsoleVerification && (
           <meta name="google-site-verification" content={searchConsoleVerification} />
         )}
       </head>
-      <body className={cn('min-h-screen bg-background font-body antialiased')}>
+      <body
+        className={cn(
+          playfair.variable,
+          ptSans.variable,
+          'min-h-screen bg-background font-body antialiased'
+        )}
+      >
         {gaMeasurementId && (
           <>
             <Script src={`https://www.googletagmanager.com/gtag/js?id=${gaMeasurementId}`} strategy="afterInteractive" />

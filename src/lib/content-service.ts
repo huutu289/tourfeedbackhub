@@ -63,16 +63,60 @@ function mapTourType(doc: FirestoreDocument): TourType {
 
 function mapTour(doc: FirestoreDocument): Tour {
   const { data } = doc;
+  const photoUrls = (Array.isArray(data.photoUrls)
+    ? data.photoUrls
+    : Array.isArray(data.mediaUrls)
+      ? data.mediaUrls
+      : [data.coverImageUrl ?? ""])
+    .map((item: unknown) => String(item).trim())
+    .filter(Boolean);
+  const videoUrls = Array.isArray(data.videoUrls)
+    ? data.videoUrls.map((item: unknown) => String(item).trim()).filter(Boolean)
+    : [];
+  const provinces = Array.isArray(data.provinces)
+    ? data.provinces.map((item: unknown) => String(item).trim()).filter(Boolean)
+    : [];
+  const provinceIds = Array.isArray(data.provinceIds)
+    ? data.provinceIds.map((item: unknown) => String(item).trim()).filter(Boolean)
+    : undefined;
+  const guideLanguages = Array.isArray(data.guideLanguages)
+    ? data.guideLanguages.map((item: unknown) => String(item).trim()).filter(Boolean)
+    : data.guideLanguage
+      ? [String(data.guideLanguage).trim()].filter(Boolean)
+      : [];
+  const guideLanguageIds = Array.isArray(data.guideLanguageIds)
+    ? data.guideLanguageIds.map((item: unknown) => String(item).trim()).filter(Boolean)
+    : undefined;
+  const clientNationalities = Array.isArray(data.clientNationalities)
+    ? data.clientNationalities.map((item: unknown) => String(item).trim()).filter(Boolean)
+    : [];
+  const clientNationalityIds = Array.isArray(data.clientNationalityIds)
+    ? data.clientNationalityIds.map((item: unknown) => String(item).trim()).filter(Boolean)
+    : undefined;
+
   return {
     id: doc.id,
+    code: data.code ?? data.tourCode ?? `FT-${doc.id}`,
     name: data.name ?? data.title ?? "Tour",
     summary: data.summary ?? data.description ?? "",
-    durationLabel: data.durationLabel ?? data.duration ?? "",
-    priceFrom: typeof data.priceFrom === "number" ? data.priceFrom : Number(data.priceFrom) || 0,
-    mediaUrls: Array.isArray(data.mediaUrls) ? data.mediaUrls : [data.coverImageUrl ?? ""],
+    startDate: toDate(data.startDate ?? data.dateStart ?? Date.now()),
+    endDate: toDate(data.endDate ?? data.dateEnd ?? Date.now()),
+    clientCount: typeof data.clientCount === "number" ? data.clientCount : Number(data.clientCount) || 0,
+    clientNationalities,
+    clientNationalityIds,
+    clientCountry: data.clientCountry ?? "",
+    clientCity: data.clientCity ?? "",
+    provinces,
+    provinceIds,
+    itinerary: data.itinerary ?? "",
+    photoUrls,
+    videoUrls,
     tourTypeIds: Array.isArray(data.tourTypeIds) ? data.tourTypeIds : undefined,
-    languages: Array.isArray(data.languages) ? data.languages : undefined,
-    highlights: Array.isArray(data.highlights) ? data.highlights : undefined,
+    guideId: data.guideId ?? undefined,
+    guideName: data.guideName ?? "",
+    guideLanguages,
+    guideLanguageIds,
+    status: data.status ?? "finished",
   };
 }
 
@@ -143,7 +187,9 @@ async function fetchPublicContent(): Promise<PublicContent> {
   ]);
 
   const mappedTourTypes = tourTypeDocs.length ? tourTypeDocs.map(mapTourType) : fallbackTourTypes;
-  const mappedTours = tourDocs.length ? tourDocs.map(mapTour) : fallbackTours;
+  const mappedTours = (tourDocs.length ? tourDocs.map(mapTour) : fallbackTours).filter(
+    (tour) => tour.status === "finished"
+  );
   const mappedStories = storyDocs.length ? storyDocs.map(mapStory) : fallbackStories;
   const mappedReviews = reviewDocs.length ? reviewDocs : fallbackReviews;
 

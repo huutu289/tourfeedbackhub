@@ -16,12 +16,21 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
   }, []); // Empty dependency array ensures this runs only once on mount
 
   useEffect(() => {
+    console.log('FirebaseClientProvider: Initializing App Check...');
+    console.log('Environment:', {
+      hasAppCheckKey: !!process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_KEY,
+      appCheckDebug: process.env.NEXT_PUBLIC_APPCHECK_DEBUG,
+      nodeEnv: process.env.NODE_ENV
+    });
+
     const appCheck = ensureAppCheck(firebaseServices.firebaseApp);
 
     if (appCheck) {
       console.log('✓ App Check initialized successfully');
+      console.log('App Check provider:', appCheck);
     } else {
-      console.warn('✗ App Check failed to initialize');
+      console.error('✗ App Check failed to initialize - check the console for errors above');
+      console.error('Without App Check, write operations to Firestore will fail');
     }
   }, [firebaseServices.firebaseApp]);
 

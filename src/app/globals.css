@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 body {
-  font-family: 'PT Sans', sans-serif;
+  font-family: var(--font-body, 'PT Sans'), sans-serif;
 }
 
 @layer base {
@@ -75,6 +75,40 @@ body {
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 217 33% 25%;
     --sidebar-ring: 211 98% 73%;
+  }
+  body.cms-skin {
+    --background: 222 47% 11%;
+    --foreground: 210 40% 96%;
+    --card: 222 47% 13%;
+    --card-foreground: 210 40% 96%;
+    --popover: 222 47% 13%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 199 94% 62%;
+    --primary-foreground: 214 61% 20%;
+    --secondary: 222 33% 18%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 222 31% 16%;
+    --muted-foreground: 215 21% 72%;
+    --accent: 199 94% 62%;
+    --accent-foreground: 214 61% 20%;
+    --destructive: 0 70% 45%;
+    --destructive-foreground: 210 40% 96%;
+    --border: 222 33% 22%;
+    --input: 222 33% 22%;
+    --ring: 199 94% 62%;
+    --chart-1: 199 94% 62%;
+    --chart-2: 207 66% 40%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 271 65% 60%;
+    --chart-5: 340 75% 55%;
+    --sidebar-background: 222 33% 16%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 199 94% 62%;
+    --sidebar-primary-foreground: 214 61% 20%;
+    --sidebar-accent: 222 33% 22%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-border: 222 33% 20%;
+    --sidebar-ring: 199 94% 62%;
   }
 }
 

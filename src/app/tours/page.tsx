@@ -5,53 +5,85 @@ import { getPublicContent } from '@/lib/content-service';
 
 export default async function ToursPage() {
   const { tours, tourTypes } = await getPublicContent();
+  const finishedTours = tours.filter((tour) => tour.status === 'finished');
   const tourTypeMap = new Map(tourTypes.map((type) => [type.id, type.title]));
 
   return (
     <div className="py-16 md:py-24">
       <div className="container mx-auto px-4">
         <div className="text-center max-w-3xl mx-auto">
-          <h1 className="text-4xl md:text-5xl font-headline font-bold">Signature Journeys</h1>
+          <h1 className="text-4xl md:text-5xl font-headline font-bold">Finished Tour Diaries</h1>
           <p className="mt-4 text-lg text-muted-foreground">
-            Teaser itineraries curated from our most-loved bespoke experiences. Request the full program to tailor it your way.
+            Browse recent bespoke journeys, discover day-by-day highlights, and see how travellers rated their guide.
           </p>
         </div>
 
-        <div className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-          {tours.map((tour) => (
-            <TourCard key={tour.id} tour={tour} />
-          ))}
-        </div>
+        {finishedTours.length > 0 ? (
+          <div className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+            {finishedTours.map((tour) => (
+              <TourCard key={tour.id} tour={tour} />
+            ))}
+          </div>
+        ) : (
+          <p className="mt-12 text-center text-muted-foreground">
+            Completed journeys will appear here once published by the team.
+          </p>
+        )}
 
-        <div className="mt-16 space-y-6">
-          <h2 className="text-2xl font-headline font-semibold">What to expect</h2>
-          {tours.map((tour) => (
-            <Card key={`${tour.id}-details`} className="bg-card/50">
-              <CardHeader>
-                <CardTitle className="text-xl font-headline">{tour.name}</CardTitle>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  <Badge variant="outline">{tour.durationLabel}</Badge>
-                  <Badge variant="outline">From ${tour.priceFrom}</Badge>
-                  {tour.tourTypeIds?.map((typeId) => (
-                    <Badge key={typeId} variant="secondary">
-                      {tourTypeMap.get(typeId) ?? 'Experience'}
+        {finishedTours.length > 0 && (
+          <div className="mt-16 space-y-6">
+            <h2 className="text-2xl font-headline font-semibold">Diary snapshots</h2>
+            {finishedTours.map((tour) => (
+              <Card key={`${tour.id}-details`} className="bg-card/50">
+                <CardHeader>
+                  <CardTitle className="text-xl font-headline">{tour.name}</CardTitle>
+                  <div className="flex flex-wrap gap-2 mt-2 text-xs uppercase tracking-wide text-muted-foreground">
+                    <Badge variant="outline">{tour.code}</Badge>
+                    <Badge variant="outline">
+                      {tour.startDate.toLocaleDateString()} – {tour.endDate.toLocaleDateString()}
                     </Badge>
-                  ))}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground leading-relaxed">{tour.summary}</p>
-                {tour.highlights && tour.highlights.length > 0 && (
-                  <ul className="mt-4 list-disc pl-5 space-y-1 text-sm text-foreground/80">
-                    {tour.highlights.map((highlight) => (
-                      <li key={highlight}>{highlight}</li>
+                    <Badge variant="outline">{tour.clientCount} guests</Badge>
+                    <Badge variant="secondary">Guide {tour.guideName}</Badge>
+                    {tour.tourTypeIds?.map((typeId) => (
+                      <Badge key={typeId} variant="outline">
+                        {tourTypeMap.get(typeId) ?? 'Experience'}
+                      </Badge>
                     ))}
-                  </ul>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-muted-foreground leading-relaxed">{tour.summary}</p>
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground/80">Traveller nationalities</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {tour.clientNationalities.join(', ') || 'Not recorded'}
+                    </p>
+                  </div>
+                  {tour.provinces?.length ? (
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground/80">Provinces visited</h3>
+                      <p className="text-sm text-muted-foreground">{tour.provinces.join(', ')}</p>
+                    </div>
+                  ) : null}
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground/80">Guide feedback</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {tour.guideLanguages?.length
+                        ? `Guide ${tour.guideName} leads in ${tour.guideLanguages.join(', ')}. Travellers rate the guide after each journey — open the diary to read their comments.`
+                        : 'Travellers rate the guide after each journey — open the diary to read their comments.'}
+                    </p>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground/80">Itinerary</h3>
+                    <div className="mt-2 whitespace-pre-line text-sm text-muted-foreground leading-relaxed">
+                      {tour.itinerary}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

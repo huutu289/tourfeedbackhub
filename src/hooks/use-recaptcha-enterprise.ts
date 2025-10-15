@@ -28,7 +28,9 @@ const SCRIPT_ID = "recaptcha-enterprise-script";
 export function useRecaptchaEnterprise({ action }: UseRecaptchaEnterpriseOptions): UseRecaptchaEnterpriseResult {
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  const siteKeyRef = useRef<string | undefined>(process.env.NEXT_PUBLIC_RECAPTCHA_ENTERPRISE_KEY);
+  const resolvedSiteKey =
+    process.env.NEXT_PUBLIC_RECAPTCHA_ENTERPRISE_KEY || process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_KEY;
+  const siteKeyRef = useRef<string | undefined>(resolvedSiteKey);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -36,7 +38,11 @@ export function useRecaptchaEnterprise({ action }: UseRecaptchaEnterpriseOptions
     const siteKey = siteKeyRef.current;
 
     if (!siteKey) {
-      setError(new Error("Missing NEXT_PUBLIC_RECAPTCHA_ENTERPRISE_KEY"));
+      setError(
+        new Error(
+          "Missing reCAPTCHA Enterprise site key. Set NEXT_PUBLIC_RECAPTCHA_ENTERPRISE_KEY or NEXT_PUBLIC_FIREBASE_APP_CHECK_KEY."
+        )
+      );
       return;
     }
 
@@ -75,7 +81,9 @@ export function useRecaptchaEnterprise({ action }: UseRecaptchaEnterpriseOptions
   const execute = useCallback(async () => {
     const siteKey = siteKeyRef.current;
     if (!siteKey) {
-      throw new Error("Missing NEXT_PUBLIC_RECAPTCHA_ENTERPRISE_KEY");
+      throw new Error(
+        "Missing reCAPTCHA Enterprise site key. Set NEXT_PUBLIC_RECAPTCHA_ENTERPRISE_KEY or NEXT_PUBLIC_FIREBASE_APP_CHECK_KEY."
+      );
     }
     if (!window.grecaptcha?.enterprise) {
       throw new Error("reCAPTCHA Enterprise has not loaded yet");

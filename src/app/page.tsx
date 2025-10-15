@@ -10,6 +10,7 @@ import { getPublicContent } from '@/lib/content-service';
 
 export default async function Home() {
   const { siteSettings, tours, reviews, tourTypes, stories } = await getPublicContent();
+  const finishedTours = tours.filter((tour) => tour.status === 'finished');
   const approvedReviews = reviews.filter((review) => review.status === 'approved').slice(0, 3);
   const heroImage = siteSettings.heroMediaUrl;
   const featuredStory = stories.at(0);
@@ -127,11 +128,17 @@ export default async function Home() {
           <p className="mt-4 text-center max-w-2xl mx-auto text-muted-foreground">
             Explore traveller favourites curated from heartfelt feedback.
           </p>
-          <div className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-            {tours.slice(0, 3).map((tour) => (
-              <TourCard key={tour.id} tour={tour} />
-            ))}
-          </div>
+          {finishedTours.length > 0 ? (
+            <div className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+              {finishedTours.slice(0, 3).map((tour) => (
+                <TourCard key={tour.id} tour={tour} />
+              ))}
+            </div>
+          ) : (
+            <p className="mt-8 text-center text-muted-foreground">
+              Finished journey highlights will appear here once published.
+            </p>
+          )}
         </div>
       </section>
 

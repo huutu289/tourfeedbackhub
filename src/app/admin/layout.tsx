@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
@@ -13,18 +14,23 @@ export default function AdminLayout({
   const pathname = usePathname();
   const isLoginPage = pathname === '/admin/login';
 
-  // Don't protect the login page
+  useEffect(() => {
+    document.body.classList.add('cms-skin');
+    return () => {
+      document.body.classList.remove('cms-skin');
+    };
+  }, []);
+
   if (isLoginPage) {
-    return <>{children}</>;
+    return <div className="min-h-screen bg-background text-foreground">{children}</div>;
   }
 
-  // Protect all other admin pages
   return (
     <AdminRouteGuard>
-      <SidebarProvider>
+      <SidebarProvider className="bg-background text-foreground">
         <AdminSidebar />
-        <SidebarInset>
-          <div className="p-4 sm:p-6 lg:p-8">{children}</div>
+        <SidebarInset className="bg-muted/30 text-foreground">
+          <div className="min-h-svh p-4 sm:p-6 lg:p-8">{children}</div>
         </SidebarInset>
       </SidebarProvider>
     </AdminRouteGuard>

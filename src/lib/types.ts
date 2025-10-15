@@ -8,14 +8,27 @@ export interface TourType {
 
 export interface Tour {
   id: string;
+  code: string;
   name: string;
   summary: string;
-  durationLabel: string;
-  priceFrom: number;
-  mediaUrls: string[]; // Changed from coverImageUrl
+  startDate: Date;
+  endDate: Date;
+  clientCount: number;
+  clientNationalities: string[];
+  clientNationalityIds?: string[];
+  clientCountry: string;
+  clientCity: string;
+  provinces?: string[];
+  provinceIds?: string[];
+  itinerary: string;
+  photoUrls: string[];
+  videoUrls: string[];
   tourTypeIds?: string[];
-  languages?: string[];
-  highlights?: string[];
+  guideId?: string;
+  guideName: string;
+  guideLanguages: string[];
+  guideLanguageIds?: string[];
+  status: 'finished' | 'for_sale';
 }
 
 export interface Story {
@@ -51,6 +64,43 @@ export interface Feedback extends Review {
   }>;
 }
 
+export interface FinishedTourComment {
+  id: string;
+  tourId: string;
+  authorName: string;
+  rating: number;
+  message: string;
+  createdAt: Date;
+}
+
+export interface GuideLanguage {
+  id: string;
+  name: string;
+  code?: string;
+}
+
+export interface Province {
+  id: string;
+  name: string;
+  country?: string;
+}
+
+export interface Nationality {
+  id: string;
+  name: string;
+  code?: string;
+}
+
+export interface Guide {
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  languageIds?: string[];
+  provinceIds?: string[];
+  nationalityIds?: string[];
+}
+
 export interface ContactInfo {
   email?: string;
   phone?: string;
@@ -58,7 +108,6 @@ export interface ContactInfo {
   zalo?: string;
   facebook?: string;
   instagram?: string;
-  youtube?: string;
   location?: string;
 }
 

@@ -10,6 +10,12 @@ import {
   Star,
   LogOut,
   BookText,
+  Layers,
+  FileText,
+  Users,
+  Languages,
+  MapPinned,
+  Flag,
 } from "lucide-react";
 
 import {
@@ -35,6 +41,18 @@ const menuItems = [
     tooltip: "Dashboard",
   },
   {
+    href: "/admin/settings",
+    icon: FileText,
+    label: "Site Content",
+    tooltip: "Manage About & Contact details",
+  },
+  {
+    href: "/admin/tour-types",
+    icon: Layers,
+    label: "Tour Types",
+    tooltip: "Manage Tour Types",
+  },
+  {
     href: "/admin/tours",
     icon: Map,
     label: "Tours",
@@ -53,10 +71,28 @@ const menuItems = [
     tooltip: "Manage Reviews",
   },
   {
-    href: "/admin/settings",
-    icon: Settings,
-    label: "Settings",
-    tooltip: "Site Settings",
+    href: "/admin/guides",
+    icon: Users,
+    label: "Guides",
+    tooltip: "Manage Guides",
+  },
+  {
+    href: "/admin/master-data/languages",
+    icon: Languages,
+    label: "Languages",
+    tooltip: "Finished Tour Languages",
+  },
+  {
+    href: "/admin/master-data/provinces",
+    icon: MapPinned,
+    label: "Provinces",
+    tooltip: "Guide Provinces",
+  },
+  {
+    href: "/admin/master-data/nationalities",
+    icon: Flag,
+    label: "Nationalities",
+    tooltip: "Guest Nationalities",
   },
 ];
 

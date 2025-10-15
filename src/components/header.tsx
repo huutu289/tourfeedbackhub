@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { MessageSquare, Menu, UserCog } from 'lucide-react';
 import { useAdmin } from '@/hooks/use-admin';
 import { Button } from '@/components/ui/button';
@@ -22,10 +23,16 @@ const baseNavLinks = [
   { href: '/contact', label: 'Contact' },
 ];
 
-const adminLink = { href: '/admin/dashboard', label: 'Admin', icon: UserCog };
+const adminLink = { href: '/admin/dashboard', label: 'CMS', icon: UserCog };
 
 export default function Header() {
+  const pathname = usePathname();
   const { isAdmin } = useAdmin();
+  const isAdminRoute = pathname.startsWith('/admin');
+
+  if (isAdminRoute) {
+    return null;
+  }
 
   const navLinks = isAdmin ? [...baseNavLinks, adminLink] : baseNavLinks;
 
@@ -51,10 +58,10 @@ export default function Header() {
         </nav>
         <div className="flex flex-1 items-center justify-end">
           {isAdmin && (
-            <Button asChild variant="ghost" className="hidden md:flex">
+            <Button asChild variant="secondary" className="hidden md:flex">
               <Link href={adminLink.href}>
                 <UserCog className="mr-2 h-4 w-4" />
-                Admin
+                CMS
               </Link>
             </Button>
           )}
