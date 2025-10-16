@@ -6,6 +6,7 @@ import {
   type Tour,
   type TourType,
   type Review,
+  type HeroSlide,
 } from "@/lib/types";
 
 function buildNavigationTree(flatItems: NavigationMenuItem[]): NavigationMenuItem[] {
@@ -83,6 +84,27 @@ export const siteSettings: SiteSettings = {
   primaryColor: "#77B5FE",
   accentColor: "#4682B4",
 };
+
+export const heroSlides: HeroSlide[] = [
+  {
+    id: "fallback-slide",
+    locale: "en",
+    title: siteSettings.heroTitle,
+    subtitle: siteSettings.heroSubtitle,
+    buttonText: siteSettings.heroCtaLabel,
+    buttonLink: "/feedback",
+    imageUrl: siteSettings.heroMediaUrl ?? "https://picsum.photos/seed/hero-fallback/1600/900",
+    order: 10,
+    active: true,
+    status: "published",
+    overlayOpacity: 0.5,
+    alt: siteSettings.heroTitle,
+    startAt: null,
+    endAt: null,
+    updatedBy: null,
+    updatedAt: null,
+  },
+];
 
 export const tourTypes: TourType[] = [
   {

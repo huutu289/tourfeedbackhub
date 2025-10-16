@@ -10,6 +10,7 @@ import type {
   TourType,
   Story,
   PublicContent,
+  HeroSlide,
 } from './types';
 import {
   siteSettings as fallbackSiteSettings,
@@ -17,6 +18,7 @@ import {
   tours as fallbackTours,
   stories as fallbackStories,
   reviews as fallbackReviews,
+  heroSlides as fallbackHeroSlides,
 } from './data';
 import {initializeApp, getApps, cert} from 'firebase-admin/app';
 import {getFirestore} from 'firebase-admin/firestore';
@@ -91,6 +93,16 @@ function toDate(value: any): Date {
   return new Date(value);
 }
 
+function toOptionalDate(value: any): Date | null {
+  if (!value) return null;
+  if (value.toDate) {
+    const result = value.toDate();
+    return result instanceof Date && !Number.isNaN(result.getTime()) ? result : null;
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 function mapSiteSettings(data: any): SiteSettings {
   const base = {
     ...fallbackSiteSettings,
@@ -142,6 +154,35 @@ function mapDoc(doc: any): any {
   return {id: doc.id, ...doc.data()};
 }
 
+function mapSlide(doc: any): HeroSlide {
+  return {
+    id: doc.id,
+    locale: String(doc.locale ?? 'en').toLowerCase(),
+    title: doc.title ?? 'Untitled slide',
+    subtitle: doc.subtitle ?? undefined,
+    buttonText: doc.buttonText ?? 'Learn more',
+    buttonLink: doc.buttonLink ?? '/',
+    imageUrl: doc.imageUrl ?? '',
+    order: typeof doc.order === 'number' ? doc.order : Number(doc.order) || 0,
+    active: doc.active !== false,
+    status: doc.status === 'published' ? 'published' : 'draft',
+    overlayOpacity: typeof doc.overlayOpacity === 'number' ? doc.overlayOpacity : null,
+    alt: typeof doc.alt === 'string' ? doc.alt : null,
+    startAt: toOptionalDate(doc.startAt),
+    endAt: toOptionalDate(doc.endAt),
+    updatedBy: typeof doc.updatedBy === 'string' ? doc.updatedBy : null,
+    updatedAt: toOptionalDate(doc.updatedAt),
+  };
+}
+
+function isSlideLive(slide: HeroSlide, reference: Date): boolean {
+  if (!slide.active || slide.status !== 'published') return false;
+  if (!slide.imageUrl || !slide.title) return false;
+  if (slide.startAt && slide.startAt > reference) return false;
+  if (slide.endAt && slide.endAt < reference) return false;
+  return true;
+}
+
 async function fetchCollection(collectionName: string) {
   const adminApp = getAdminApp();
   if (!adminApp) return [];
@@ -165,13 +206,14 @@ async function fetchSiteSettings() {
 
 export const getPublicContent = cache(async (): Promise<PublicContent> => {
   try {
-    const [siteSettings, tourTypesData, toursData, storiesData, reviewsData] =
+    const [siteSettings, tourTypesData, toursData, storiesData, reviewsData, slidesData] =
       await Promise.all([
         fetchSiteSettings(),
         fetchCollection('tourTypes'),
         fetchCollection('tours'),
         fetchCollection('stories'),
         fetchCollection('reviews'),
+        fetchCollection('siteContentSlides'),
       ]);
 
     const reviews = (reviewsData as any[])
@@ -191,6 +233,12 @@ export const getPublicContent = cache(async (): Promise<PublicContent> => {
       })
     );
 
+    const now = new Date();
+    const slidesRaw = (slidesData as any[]).map(mapSlide);
+    const slides = slidesRaw
+      .filter(slide => isSlideLive(slide, now))
+      .sort((a, b) => (a.order === b.order ? a.title.localeCompare(b.title) : a.order - b.order));
+
     return {
       siteSettings,
       tourTypes:
@@ -200,6 +248,7 @@ export const getPublicContent = cache(async (): Promise<PublicContent> => {
       tours: toursData.length > 0 ? (toursData as Tour[]) : fallbackTours,
       stories: stories.length > 0 ? stories : fallbackStories,
       reviews: reviews.length > 0 ? reviews : fallbackReviews,
+      slides: slides.length > 0 ? slides : fallbackHeroSlides,
     };
   } catch (error) {
     console.warn(
@@ -212,6 +261,7 @@ export const getPublicContent = cache(async (): Promise<PublicContent> => {
       tours: fallbackTours,
       stories: fallbackStories,
       reviews: fallbackReviews.filter(r => r.status === 'approved'),
+      slides: fallbackHeroSlides,
     };
   }
 });

@@ -9,7 +9,6 @@ import {
   collection,
   deleteDoc,
   doc,
-  orderBy,
   query,
   serverTimestamp,
   setDoc,
@@ -272,8 +271,7 @@ export default function SlideManager() {
     () =>
       query(
         collection(firestore, 'siteContentSlides'),
-        where('locale', '==', selectedLocale),
-        orderBy('order', 'asc')
+        where('locale', '==', selectedLocale)
       ),
     [firestore, selectedLocale]
   );
@@ -300,12 +298,11 @@ export default function SlideManager() {
   }, [slides, selectedLocale]);
 
   const hasOrderChanges = useMemo(() => {
-    if (!slideDocs) return false;
-    if (slideDocs.length !== draftSlides.length) return true;
-    const originalIds = slideDocs.map((doc) => doc.id);
+    if (slides.length !== draftSlides.length) return true;
+    const originalIds = slides.map((slide) => slide.id);
     const currentIds = draftSlides.map((slide) => slide.id);
     return originalIds.some((id, index) => currentIds[index] !== id);
-  }, [draftSlides, slideDocs]);
+  }, [draftSlides, slides]);
 
   const isAtLimit = draftSlides.length >= MAX_SLIDES;
 
@@ -795,7 +792,7 @@ function SlideFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{initialSlide ? 'Edit slide' : 'Add slide'} – {locale.toUpperCase()}</DialogTitle>
         </DialogHeader>
@@ -964,8 +961,8 @@ function SlideFormDialog({
                 control={form.control}
                 name="active"
                 render={({ field }) => (
-                  <FormItem className="flex flex-col justify-end">
-                    <FormLabel className="mb-2">Active</FormLabel>
+                  <FormItem className="sm:col-span-2">
+                    <FormLabel>Active</FormLabel>
                     <FormControl>
                       <div className="flex items-center gap-2">
                         <Switch checked={field.value} onCheckedChange={field.onChange} />
@@ -980,36 +977,49 @@ function SlideFormDialog({
               />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-3">
-                <div className="relative h-40 w-full overflow-hidden rounded-md bg-muted">
-                  {imageUrl ? (
-                    <Image src={imageUrl} alt={form.getValues('alt') || 'Slide preview'} fill className="object-cover" sizes="100vw" />
-                  ) : (
-                    <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
-                      <ImageIcon className="h-8 w-8" />
-                      <span className="text-sm">Preview appears after selecting an image</span>
-                    </div>
-                  )}
+            <div className="space-y-4 border-t pt-4">
+              <h3 className="text-sm font-medium">Image Upload</h3>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="space-y-3">
+                  <div className="relative h-48 w-full overflow-hidden rounded-md border bg-muted">
+                    {imageUrl ? (
+                      <Image src={imageUrl} alt={form.getValues('alt') || 'Slide preview'} fill className="object-cover" sizes="(max-width: 1024px) 100vw, 50vw" />
+                    ) : (
+                      <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
+                        <ImageIcon className="h-8 w-8" />
+                        <span className="text-sm">Preview appears after upload</span>
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={handleUpload}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="w-full"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                  >
+                    {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {isUploading ? 'Uploading...' : 'Upload image'}
+                  </Button>
                 </div>
-              </div>
-              <div className="space-y-3">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  hidden
-                  onChange={handleUpload}
-                />
-                <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
-                  {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Upload image
-                </Button>
-                <Textarea
-                  readOnly
-                  value={imageUrl || 'Image URL will appear here after upload.'}
-                  className="min-h-[120px]"
-                />
+                <div className="space-y-3">
+                  <label className="text-sm font-medium">Generated URL</label>
+                  <Textarea
+                    readOnly
+                    value={imageUrl || 'Image URL will appear here after upload.'}
+                    className="min-h-[180px] font-mono text-xs"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    This URL is automatically generated and saved to the slide.
+                  </p>
+                </div>
               </div>
             </div>
 

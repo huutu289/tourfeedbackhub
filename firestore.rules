@@ -95,5 +95,10 @@ service cloud.firestore {
       allow read: if true;
       allow write: if canWriteAdmin();
     }
+
+    match /siteContentSlides/{slideId} {
+      allow read: if true;
+      allow write: if canWriteAdmin();
+    }
   }
 }

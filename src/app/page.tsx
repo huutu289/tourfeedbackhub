@@ -7,42 +7,22 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import TourCard from '@/components/tour-card';
 import { getPublicContent } from '@/lib/content-service';
+import HeroCarousel from '@/components/hero-carousel';
 
 export default async function Home() {
-  const { siteSettings, tours, reviews, tourTypes, stories } = await getPublicContent();
+  const { siteSettings, tours, reviews, tourTypes, stories, slides } = await getPublicContent();
   const finishedTours = tours.filter((tour) => tour.status === 'finished');
   const approvedReviews = reviews.filter((review) => review.status === 'approved').slice(0, 3);
-  const heroImage = siteSettings.heroMediaUrl;
+  const defaultLocale = (siteSettings.defaultLanguage ?? 'en').toLowerCase();
+  const slidesForLocale = slides.filter((slide) => slide.locale.toLowerCase() === defaultLocale);
+  const heroSlides = slidesForLocale.length ? slidesForLocale : slides;
+  const primarySlide = heroSlides[0];
+  const heroImage = primarySlide?.imageUrl ?? siteSettings.heroMediaUrl;
   const featuredStory = stories.at(0);
 
   return (
     <div className="flex flex-col min-h-screen">
-      <section className="relative w-full h-[60vh] md:h-[80vh]">
-        {heroImage && (
-          <Image
-            src={heroImage}
-            alt={siteSettings.heroTitle}
-            fill
-            className="object-cover"
-            priority
-            sizes="100vw"
-          />
-        )}
-        <div className="absolute inset-0 bg-black/50" />
-        <div className="relative z-10 flex flex-col items-center justify-center h-full text-center text-white p-4">
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-headline font-bold !leading-tight max-w-4xl">
-            {siteSettings.heroTitle}
-          </h1>
-          <p className="mt-4 max-w-2xl text-lg md:text-xl text-primary-foreground/90 font-body">
-            {siteSettings.heroSubtitle}
-          </p>
-          <Button asChild size="lg" className="mt-8 bg-primary text-primary-foreground hover:bg-primary/90">
-            <Link href="/feedback">
-              {siteSettings.heroCtaLabel} <ArrowRight className="ml-2 h-5 w-5" />
-            </Link>
-          </Button>
-        </div>
-      </section>
+      <HeroCarousel slides={heroSlides} />
 
       <section className="py-16 md:py-24 bg-background">
         <div className="container mx-auto px-4">
@@ -193,7 +173,13 @@ export default async function Home() {
           <div className="grid md:grid-cols-2 gap-8 items-center py-16 md:py-24">
             <div className="relative w-full h-80 rounded-lg overflow-hidden shadow-lg">
               {heroImage && (
-                <Image src={heroImage} alt={siteSettings.heroTitle} fill className="object-cover" sizes="(min-width: 768px) 50vw, 100vw" />
+                <Image
+                  src={heroImage}
+                  alt={primarySlide?.title ?? siteSettings.heroTitle}
+                  fill
+                  className="object-cover"
+                  sizes="(min-width: 768px) 50vw, 100vw"
+                />
               )}
             </div>
             <div className="text-center md:text-left">

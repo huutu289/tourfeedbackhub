@@ -168,6 +168,7 @@ export interface PublicContent {
   tours: Tour[];
   stories: Story[];
   reviews: Review[];
+  slides: HeroSlide[];
 }
 
 export type NavigationMenuKey = 'header' | 'footer';

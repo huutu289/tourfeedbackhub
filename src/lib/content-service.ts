@@ -6,8 +6,9 @@ import {
   tours as fallbackTours,
   stories as fallbackStories,
   reviews as fallbackReviews,
+  heroSlides as fallbackHeroSlides,
 } from "@/lib/data";
-import type { PublicContent, Review, SiteSettings, Story, Tour, TourType } from "@/lib/types";
+import type { PublicContent, Review, SiteSettings, Story, Tour, TourType, HeroSlide } from "@/lib/types";
 
 interface FirestoreDocument {
   id: string;
@@ -23,6 +24,20 @@ function toDate(value: unknown): Date {
     return value.toDate();
   }
   return new Date();
+}
+
+function toOptionalDate(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === "string" || typeof value === "number") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  if (typeof value === "object" && value !== null && "toDate" in value && typeof value.toDate === "function") {
+    const result = value.toDate();
+    return result instanceof Date && !Number.isNaN(result.getTime()) ? result : null;
+  }
+  return null;
 }
 
 function mapSiteSettings(data: FirebaseFirestore.DocumentData | undefined): SiteSettings {
@@ -168,6 +183,44 @@ function mapReview(doc: FirestoreDocument): Review {
   };
 }
 
+function mapSlide(doc: FirestoreDocument): HeroSlide {
+  const { data } = doc;
+  return {
+    id: doc.id,
+    locale: String(data.locale ?? "en").toLowerCase(),
+    title: data.title ?? "Untitled slide",
+    subtitle: data.subtitle ?? undefined,
+    buttonText: data.buttonText ?? "Learn more",
+    buttonLink: data.buttonLink ?? "/",
+    imageUrl: data.imageUrl ?? "",
+    order: typeof data.order === "number" ? data.order : Number(data.order) || 0,
+    active: data.active !== false,
+    status: data.status === "published" ? "published" : "draft",
+    overlayOpacity: typeof data.overlayOpacity === "number" ? data.overlayOpacity : null,
+    alt: typeof data.alt === "string" ? data.alt : null,
+    startAt: toOptionalDate(data.startAt),
+    endAt: toOptionalDate(data.endAt),
+    updatedBy: typeof data.updatedBy === "string" ? data.updatedBy : null,
+    updatedAt: toOptionalDate(data.updatedAt),
+  };
+}
+
+function isSlideLive(slide: HeroSlide, reference: Date): boolean {
+  if (!slide.active || slide.status !== "published") {
+    return false;
+  }
+  if (!slide.imageUrl || !slide.title) {
+    return false;
+  }
+  if (slide.startAt && slide.startAt > reference) {
+    return false;
+  }
+  if (slide.endAt && slide.endAt < reference) {
+    return false;
+  }
+  return true;
+}
+
 async function fetchCollection(collectionPath: string): Promise<FirestoreDocument[]> {
   const admin = initializeFirebaseAdmin();
   if (!admin) return [];
@@ -200,12 +253,13 @@ async function fetchSiteSettings(): Promise<SiteSettings> {
 }
 
 async function fetchPublicContent(): Promise<PublicContent> {
-  const [settings, tourTypeDocs, tourDocs, storyDocs, reviewDocs] = await Promise.all([
+  const [settings, tourTypeDocs, tourDocs, storyDocs, reviewDocs, slideDocs] = await Promise.all([
     fetchSiteSettings(),
     fetchCollection("tourTypes"),
     fetchCollection("tours"),
     fetchCollection("stories"),
     fetchApprovedReviews(),
+    fetchCollection("siteContentSlides"),
   ]);
 
   const mappedTourTypes = tourTypeDocs.length ? tourTypeDocs.map(mapTourType) : fallbackTourTypes;
@@ -214,6 +268,17 @@ async function fetchPublicContent(): Promise<PublicContent> {
   );
   const mappedStories = storyDocs.length ? storyDocs.map(mapStory) : fallbackStories;
   const mappedReviews = reviewDocs.length ? reviewDocs : fallbackReviews;
+  const now = new Date();
+  const mappedSlidesRaw = slideDocs.length ? slideDocs.map(mapSlide) : [];
+  const mappedSlides = mappedSlidesRaw
+    .filter((slide) => isSlideLive(slide, now))
+    .sort((a, b) => {
+      if (a.order === b.order) {
+        return a.title.localeCompare(b.title);
+      }
+      return a.order - b.order;
+    });
+  const slides = mappedSlides.length ? mappedSlides : fallbackHeroSlides;
 
   return {
     siteSettings: settings,
@@ -221,6 +286,7 @@ async function fetchPublicContent(): Promise<PublicContent> {
     tours: mappedTours,
     stories: mappedStories,
     reviews: mappedReviews,
+    slides,
   };
 }
 
@@ -235,6 +301,7 @@ export const getPublicContent = cache(async (): Promise<PublicContent> => {
       tours: fallbackTours,
       stories: fallbackStories,
       reviews: fallbackReviews.filter((review) => review.status === "approved"),
+      slides: fallbackHeroSlides,
     };
   }
 });
