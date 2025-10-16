@@ -1,54 +1,40 @@
-Repository Guidelines
-=====================
+# Repository Guidelines
 
-Project Structure & Module Organization
----------------------------------------
-- Core app routes/pages live under `src/app` (Next.js App Router). Keep page components lean and move logic into helpers.
-- Reusable UI elements sit in `src/components`; global styling is managed in `src/app/globals.css`.
-- Domain logic and utilities belong in `src/lib`; prefer colocated types and helpers.
-- Firebase integrations reside in `src/firebase` (client/admin configs and hooks). React hooks go in `src/hooks`.
-- AI and Genkit flows stay in `src/ai`. Documentation and project-wide configs are in `docs/`, `next.config.ts`, `tailwind.config.ts`, `firebase.json`, and `firestore.rules`.
-- Use path aliases (`@/...`) defined in `tsconfig.json` instead of relative paths.
+## Project Structure & Module Organization
+- Next.js App Router pages live in `src/app`; `src/app/page.tsx` is the entry and heavy logic should live in `src/lib`.
+- UI blocks sit in `src/components` (ShadCN-based) with shared hooks in `src/hooks` and assets in `public/`.
+- Firebase client/admin configs belong in `src/firebase`, AI flows in `src/ai`, and docs and config files live at the repo root (`docs/`, `next.config.ts`, `tailwind.config.ts`).
+- Prefer path aliases such as `@/lib/example` over nested relative imports.
 
-Build, Test, and Development Commands
--------------------------------------
-- `npm run dev` — Launches the Next.js dev server (Turbopack) on port 9002.
-- `npm run build` — Creates a production build; run before deploying.
-- `npm start` — Serves the output from `npm run build`.
-- `npm run lint` — Runs Next.js/ESLint rules; resolve all warnings before committing.
-- `npm run typecheck` — Executes TypeScript checks without emitting build artifacts.
-- `npm run genkit:dev` / `npm run genkit:watch` — Run Genkit flows locally for AI development.
+## Build, Test, and Development Commands
+- `npm run dev` starts the Turbopack dev server on port 9002.
+- `npm run build` generates the production bundle and `npm start` serves it for smoke tests.
+- `npm run lint` enforces Next.js ESLint rules—fix every warning.
+- `npm run typecheck` runs `tsc --noEmit` to catch type issues.
+- `npm run genkit:dev` runs local Genkit flows during AI work.
 
-Coding Style & Naming Conventions
----------------------------------
-- Language stack: TypeScript + React function components with 2-space indentation and sub-100-char lines when practical.
-- Name route files `page.tsx` inside their route directories; components use PascalCase (e.g., `MyWidget.tsx`).
-- Co-locate Tailwind classes within JSX; favor semantic naming and minimal utility combinations.
-- Default to ASCII characters unless a file already uses Unicode. Keep comments focused and only when clarifying non-obvious logic.
+## Coding Style & Naming Conventions
+- Code in TypeScript with React function components, 2-space indentation, and sub-100-character lines.
+- Name routes `page.tsx`, components `PascalCase.tsx`, utilities `camelCase.ts`, and hooks `useSomething.ts`.
+- Keep Tailwind classes near their JSX and prefer semantic, minimal utility stacks.
+- Default to ASCII; add comments only when clarifying non-obvious intent.
 
-Testing Guidelines
-------------------
-- Tests are not yet configured. When adding coverage, use Vitest with Testing Library.
-- Store tests adjacent to sources (`Component.test.tsx`) or under `src/__tests__`.
-- Ensure tests remain deterministic; add a `test` script (e.g., `vitest run`) if you introduce Vitest.
+## Testing Guidelines
+- Adopt Vitest with Testing Library when introducing coverage.
+- Store specs beside sources (`Component.test.tsx`) or under `src/__tests__`.
+- Keep tests deterministic and, once Vitest is wired in, expose a `test` script such as `vitest run`.
 
-Commit & Pull Request Guidelines
---------------------------------
-- Use concise, imperative commits; Conventional Commits (`feat:`, `fix:`, `docs:`) are encouraged.
-- Pull requests should explain the change, link issues (`Closes #123`), and include UI screenshots or GIFs when applicable.
-- Keep PRs focused, fix lint and type errors, and highlight follow-up work separately.
+## Commit & Pull Request Guidelines
+- Write concise, imperative commit messages; Conventional Commits (`feat:`, `fix:`, `docs:`) are encouraged.
+- PRs should summarize changes, link issues (`Closes #123`), and include UI evidence for visual updates.
+- Run `npm run lint` and `npm run typecheck` before review and call out deliberate follow-up tasks.
 
-Security & Configuration Tips
------------------------------
-- Never commit secrets. Store environment values in `.env.local` (gitignored); wrap multiline secrets in quotes and escape newlines as `\n`.
-- Validate Firestore rules (`firestore.rules`) and indexes before deploys. Use Firebase Emulators when practical for local validation.
+## Security & Configuration Tips
+- Never commit secrets; store environment values in `.env.local` (gitignored) and escape multiline strings with `\n`.
+- Key env vars include Firebase credentials (`FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, `FIREBASE_STORAGE_BUCKET`) and client keys (`NEXT_PUBLIC_CLOUD_FUNCTIONS_BASE_URL`, `NEXT_PUBLIC_FIREBASE_APP_CHECK_KEY`, `NEXT_PUBLIC_RECAPTCHA_ENTERPRISE_KEY`).
+- Validate `firestore.rules` and index tweaks via Firebase Emulators before deploying.
 
-Architecture Overview
----------------------
-- Next.js App Router handles routing and rendering. Firebase powers authentication and data access. Genkit supports AI/automation flows.
-- Client-facing code resides in `src/app`, shared logic in `src/lib`, while integrations live in `src/firebase` and `src/ai`. Follow this separation to keep responsibilities clear.
-
-Agent-Specific Instructions
----------------------------
-- Prefer minimal, focused diffs and maintain existing conventions. Use `apply_patch` for edits whenever feasible.
-- Favor `@/...` imports, run `npm run lint` and `npm run typecheck` before proposing changes, and avoid reverting user-authored modifications.
+## Firebase & Deploy Workflows
+- Cloud Functions live under `functions/`; build with `cd functions && npm run build` before deploying.
+- Deploy functions via `firebase deploy --only functions`; deploy rules with `firebase deploy --only firestore:rules,storage`.
+- Media uploads use Cloud Functions (`adminTourUploadDirect`, `adminTourUploadUrl`) and store assets under `/tours/{tourId}/` with token-based access control—verify any rule changes against this contract.

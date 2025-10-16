@@ -1,5 +1,6 @@
 'use client';
 
+import '@/lib/polyfills';
 import React, { useEffect, useMemo, type ReactNode } from 'react';
 import { FirebaseProvider } from '@/firebase/provider';
 import { initializeFirebase } from '@/firebase';

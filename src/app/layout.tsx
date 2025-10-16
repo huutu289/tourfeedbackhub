@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Script from 'next/script';
 import { Playfair_Display, PT_Sans } from 'next/font/google';
 import './globals.css';
+import '@/lib/polyfills';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/toaster';
 import Header from '@/components/header';
@@ -71,6 +72,27 @@ export default async function RootLayout({
         {searchConsoleVerification && (
           <meta name="google-site-verification" content={searchConsoleVerification} />
         )}
+        <Script id="crypto-polyfill" strategy="beforeInteractive">
+          {`
+            (function() {
+              if (typeof crypto !== 'undefined' && !crypto.randomUUID) {
+                crypto.randomUUID = function() {
+                  if (typeof crypto.getRandomValues === 'function') {
+                    return '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, function(c) {
+                      var num = parseInt(c, 10);
+                      return (num ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (num / 4)))).toString(16);
+                    });
+                  }
+                  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                    var r = (Math.random() * 16) | 0;
+                    var v = c === 'x' ? r : (r & 0x3) | 0x8;
+                    return v.toString(16);
+                  });
+                };
+              }
+            })();
+          `}
+        </Script>
       </head>
       <body
         className={cn(

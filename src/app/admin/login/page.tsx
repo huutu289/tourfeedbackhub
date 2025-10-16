@@ -65,12 +65,19 @@ export default function AdminLoginPage() {
       router.push('/admin/dashboard');
     } catch (err: any) {
       console.error('Login error:', err);
+      console.error('Error code:', err.code);
+      console.error('Error message:', err.message);
+      
       if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found') {
+        setError('Invalid email or password.');
+      } else if (err.code === 'auth/wrong-password') {
         setError('Invalid email or password.');
       } else if (err.code === 'auth/too-many-requests') {
         setError('Too many failed attempts. Please try again later.');
+      } else if (err.code === 'auth/network-request-failed') {
+        setError('Network error. Please check your connection.');
       } else {
-        setError('Failed to log in. Please try again.');
+        setError(`Failed to log in: ${err.message || 'Please try again.'}`);
       }
       setIsLoading(false);
     }
