@@ -1,14 +1,15 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { ArrowRight, Star, Compass, ChevronRight } from 'lucide-react';
+import { ArrowRight, Star, Compass, ChevronRight, Map, Sparkles, Users, Globe2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import TourCard from '@/components/tour-card';
 import { getPublicContent } from '@/lib/content-service';
 import HeroCarousel from '@/components/hero-carousel';
+import ReviewCarousel from '@/components/review-carousel';
+import HomeFeedbackForm from '@/components/home-feedback-form';
 
 export default async function Home() {
   const { siteSettings, tours, reviews, tourTypes, stories, slides, posts } = await getPublicContent();
@@ -17,7 +18,7 @@ export default async function Home() {
     (a, b) => b.startDate.getTime() - a.startDate.getTime()
   );
   const recentDiaries = sortedDiaries.slice(0, 3);
-  const approvedReviews = reviews.filter((review) => review.status === 'approved').slice(0, 3);
+  const approvedReviews = reviews.filter((review) => review.status === 'approved');
   const defaultLocale = (siteSettings.defaultLanguage ?? 'en').toLowerCase();
   const slidesForLocale = slides.filter((slide) => slide.locale.toLowerCase() === defaultLocale);
   const heroSlides = slidesForLocale.length ? slidesForLocale : slides;
@@ -32,60 +33,127 @@ export default async function Home() {
     .filter((post) => post.status === 'published' && post.type === 'post')
     .slice(0, 3);
 
+  const aboutImage =
+    siteSettings.heroMediaUrl ||
+    primarySlide?.imageUrl ||
+    recentDiaries[0]?.photoUrls?.[0] ||
+    null;
+
+  const ratingTotals = new Map<string, { total: number; count: number }>();
+  approvedReviews.forEach((review) => {
+    if (!review.tourId) return;
+    const current = ratingTotals.get(review.tourId) ?? { total: 0, count: 0 };
+    ratingTotals.set(review.tourId, {
+      total: current.total + review.rating,
+      count: current.count + 1,
+    });
+  });
+
+  const getTourRatingSummary = (tourId: string) => {
+    const entry = ratingTotals.get(tourId);
+    if (!entry || entry.count === 0) {
+      return null;
+    }
+    return {
+      average: entry.total / entry.count,
+      count: entry.count,
+    };
+  };
+
+  const overallAverageRating = approvedReviews.length
+    ? approvedReviews.reduce((acc, review) => acc + review.rating, 0) / approvedReviews.length
+    : 0;
+  const totalReviews = approvedReviews.length;
+
+  const normaliseValueIcon = (value: string) => {
+    const lower = value.toLowerCase();
+    if (lower.includes('authentic')) return Compass;
+    if (lower.includes('tailor') || lower.includes('personal')) return Users;
+    if (lower.includes('local') || lower.includes('insight')) return Map;
+    if (lower.includes('sustain') || lower.includes('global')) return Globe2;
+    return Sparkles;
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
       <HeroCarousel slides={heroSlides} />
 
-      <section className="py-16 md:py-24 bg-background">
+      <section className="bg-background py-16 md:py-24">
         <div className="container mx-auto px-4">
-          <div className="grid lg:grid-cols-[1.2fr_0.8fr] gap-12 items-center">
-            <div>
-              <h2 className="text-3xl md:text-4xl font-headline font-bold">{siteSettings.aboutTitle}</h2>
-              <p className="mt-4 text-muted-foreground text-lg leading-relaxed">
+          <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16">
+            <div className="space-y-6">
+              <span className="inline-flex w-fit items-center rounded-full border border-border/60 bg-card/50 px-4 py-1 text-xs uppercase tracking-[0.3em] text-muted-foreground">
+                Boutique travel, crafted locally
+              </span>
+              <h2 className="text-3xl md:text-4xl lg:text-5xl font-headline font-bold leading-tight">
+                {siteSettings.aboutTitle}
+              </h2>
+              <p className="text-lg leading-relaxed text-muted-foreground">
                 {siteSettings.aboutDescription}
               </p>
               {siteSettings.values && siteSettings.values.length > 0 && (
-                <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                  {siteSettings.values.map((value) => (
-                    <div key={value} className="flex items-start gap-3 rounded-lg border bg-card/30 p-4">
-                      <Compass className="h-5 w-5 text-accent shrink-0 mt-1" />
-                      <p className="text-sm text-muted-foreground">{value}</p>
-                    </div>
-                  ))}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {siteSettings.values.map((value) => {
+                    const ValueIcon = normaliseValueIcon(value);
+                    return (
+                      <div
+                        key={value}
+                        className="flex items-start gap-3 rounded-xl border border-border/60 bg-card/50 p-4 shadow-sm"
+                      >
+                        <ValueIcon className="mt-1 h-5 w-5 text-accent" />
+                        <p className="text-sm leading-relaxed text-muted-foreground">{value}</p>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
-              <div className="mt-6">
+              <div className="flex flex-wrap gap-3">
                 <Button asChild variant="outline">
                   <Link href="/about">Discover the story</Link>
                 </Button>
+                <Button asChild variant="ghost">
+                  <Link href="/tour-types">Explore tour styles</Link>
+                </Button>
               </div>
             </div>
-            {featuredStory && (
-              <Card className="overflow-hidden shadow-lg">
-                {featuredStory.coverImageUrl && (
-                  <div className="relative h-60 w-full">
-                    <Image
-                      src={featuredStory.coverImageUrl}
-                      alt={featuredStory.title}
-                      fill
-                      className="object-cover"
-                      sizes="(min-width: 1024px) 40vw, 100vw"
-                    />
+            <div className="relative">
+              <div className="relative h-[420px] w-full overflow-hidden rounded-3xl shadow-2xl">
+                {aboutImage ? (
+                  <Image
+                    src={aboutImage}
+                    alt="Travel moments in Vietnam"
+                    fill
+                    className="object-cover"
+                    sizes="(min-width: 1024px) 40vw, 100vw"
+                    priority
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/40 via-secondary/40 to-accent/40">
+                    <span className="text-lg font-semibold text-primary-foreground/80">
+                      Our guides, your adventures
+                    </span>
                   </div>
                 )}
-                <CardHeader>
-                  <CardTitle className="font-headline text-2xl">{featuredStory.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{featuredStory.excerpt}</p>
-                </CardContent>
-                <CardFooter>
-                  <Button asChild variant="ghost" className="px-0">
-                    <Link href="/stories">Read more stories</Link>
-                  </Button>
-                </CardFooter>
-              </Card>
-            )}
+                <div className="absolute inset-0 bg-gradient-to-tr from-black/60 via-black/20 to-transparent" />
+              </div>
+              {featuredStory && (
+                <Card className="absolute -bottom-10 left-6 right-6 border border-border/60 bg-background/95 shadow-xl">
+                  <CardHeader className="space-y-2">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Latest diary highlight</p>
+                    <CardTitle className="text-lg font-headline leading-snug">{featuredStory.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground line-clamp-3">{featuredStory.excerpt}</p>
+                  </CardContent>
+                  <CardFooter className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>{format(featuredStory.publishedAt, 'MMM d, yyyy')}</span>
+                    <Button asChild variant="ghost" className="px-0">
+                      <Link href="/stories">Read the diary</Link>
+                    </Button>
+                  </CardFooter>
+                </Card>
+              )}
+            </div>
           </div>
         </div>
       </section>
@@ -98,16 +166,26 @@ export default async function Home() {
           </p>
           <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {tourTypes.map((tourType) => (
-              <Card key={tourType.id} className="h-full">
+              <Card key={tourType.id} className="flex h-full flex-col border-border/60 bg-background/80 shadow-sm">
                 <CardHeader>
                   <div className="flex items-center gap-3">
-                    <Badge variant="outline">{tourType.icon ?? '✨'}</Badge>
+                    <Badge variant="outline" className="text-lg">
+                      {tourType.icon ?? '✨'}
+                    </Badge>
                     <CardTitle className="font-headline text-xl">{tourType.title}</CardTitle>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex-1">
                   <p className="text-sm text-muted-foreground leading-relaxed">{tourType.description}</p>
                 </CardContent>
+                <CardFooter>
+                  <Button asChild variant="ghost" className="px-0">
+                    <Link href={`/tours?style=${tourType.id}`} className="flex items-center gap-2">
+                      View tours
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                </CardFooter>
               </Card>
             ))}
           </div>
@@ -123,7 +201,7 @@ export default async function Home() {
           {recentDiaries.length > 0 ? (
             <div className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
               {recentDiaries.map((tour) => (
-                <TourCard key={tour.id} tour={tour} />
+                <TourCard key={tour.id} tour={tour} ratingSummary={getTourRatingSummary(tour.id) ?? undefined} />
               ))}
             </div>
           ) : (
@@ -269,46 +347,51 @@ export default async function Home() {
         </section>
       )}
 
-      <section id="reviews" className="py-16 md:py-24 bg-secondary/50">
+      <section id="reviews" className="bg-secondary/50 py-16 md:py-24">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-headline font-bold text-center">What Our Travelers Say</h2>
-          <div className="mt-12 grid gap-8 lg:grid-cols-3">
-            {approvedReviews.map((review) => (
-              <Card key={review.id} className="flex flex-col">
-                <CardHeader>
-                  <div className="flex items-center gap-4">
-                    <Avatar>
-                      <AvatarImage src={`https://i.pravatar.cc/150?u=${review.authorDisplay}`} />
-                      <AvatarFallback>{review.authorDisplay.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <CardTitle className="font-body text-lg font-bold">{review.authorDisplay}</CardTitle>
-                      <p className="text-sm text-muted-foreground">{review.country}</p>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  <div className="flex items-center gap-1 mb-2">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`h-5 w-5 ${i < review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
-                      />
-                    ))}
-                  </div>
-                  <p className="text-muted-foreground italic">&quot;{review.message}&quot;</p>
-                </CardContent>
-                <CardFooter className="flex items-center justify-between text-sm text-muted-foreground">
-                  {review.tourName && <Badge variant="secondary">{review.tourName}</Badge>}
-                  <span>{review.createdAt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                </CardFooter>
-              </Card>
-            ))}
+          <div className="flex flex-col items-center text-center gap-4">
+            <span className="inline-flex items-center rounded-full border border-border/60 bg-background/60 px-4 py-1 text-xs uppercase tracking-[0.3em] text-muted-foreground">
+              Guest feedback
+            </span>
+            <h2 className="text-3xl md:text-4xl font-headline font-bold">
+              Travellers rate us {overallAverageRating.toFixed(1)} / 5
+            </h2>
+            <p className="max-w-2xl text-muted-foreground">
+              {totalReviews > 0
+                ? `Based on ${totalReviews} verified review${totalReviews === 1 ? '' : 's'} from recent bespoke journeys.`
+                : 'Be the first to share your experience with our guides and boutique adventures.'}
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-3 text-sm text-muted-foreground">
+              <span className="inline-flex items-center gap-2 rounded-full bg-background/60 px-4 py-2">
+                <Star className="h-4 w-4 text-yellow-400" />
+                <span>Average rating {overallAverageRating.toFixed(1)}</span>
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full bg-background/60 px-4 py-2">
+                <Map className="h-4 w-4" />
+                <span>{finishedTours.length} tours guided this year</span>
+              </span>
+              <Button asChild variant="ghost" className="px-4">
+                <Link href="/feedback" className="flex items-center gap-2">
+                  Share your review
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
           </div>
-          <div className="mt-12 text-center">
+          <div className="mt-12">
+            <ReviewCarousel reviews={approvedReviews} />
+          </div>
+          <div className="mt-12 flex flex-wrap items-center justify-center gap-4">
             <Button asChild variant="outline">
-              <Link href="/reviews">
-                Read More Reviews <ArrowRight className="ml-2 h-4 w-4" />
+              <Link href="/reviews" className="flex items-center gap-2">
+                Read all reviews
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button asChild variant="ghost">
+              <Link href="/feedback" className="flex items-center gap-2">
+                Write a review
+                <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
           </div>
@@ -316,28 +399,60 @@ export default async function Home() {
       </section>
 
       <section className="bg-background">
-        <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-2 gap-8 items-center py-16 md:py-24">
-            <div className="relative w-full h-80 rounded-lg overflow-hidden shadow-lg">
-              {heroImage && (
-                <Image
-                  src={heroImage}
-                  alt={primarySlide?.title ?? siteSettings.heroTitle}
-                  fill
-                  className="object-cover"
-                  sizes="(min-width: 768px) 50vw, 100vw"
-                />
-              )}
+        <div className="container mx-auto px-4 py-16 md:py-24">
+          <div className="grid items-start gap-12 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="space-y-6">
+              <div className="relative overflow-hidden rounded-3xl bg-secondary/30 shadow-2xl">
+                {heroImage ? (
+                  <Image
+                    src={heroImage}
+                    alt={primarySlide?.title ?? siteSettings.heroTitle}
+                    fill
+                    className="object-cover"
+                    sizes="(min-width: 1024px) 40vw, 100vw"
+                  />
+                ) : null}
+                <div className="absolute inset-0 bg-gradient-to-br from-black/60 via-black/20 to-transparent" />
+                <div className="relative z-10 flex h-full flex-col justify-end gap-4 p-8 text-white">
+                  <span className="inline-flex w-fit items-center rounded-full border border-white/40 bg-white/10 px-4 py-1 text-xs uppercase tracking-[0.3em]">
+                    Feedback matters
+                  </span>
+                  <p className="text-2xl font-headline leading-snug drop-shadow">“Your reflections shape tomorrow’s adventures.”</p>
+                  <span className="text-sm text-white/80">
+                    We share highlights with guides and planners each week to keep experiences boutique and personal.
+                  </span>
+                </div>
+              </div>
+              <div className="space-y-4 text-center lg:text-left">
+                <h2 className="text-3xl md:text-4xl font-headline font-bold">Your voice guides our next itinerary</h2>
+                <p className="text-lg text-muted-foreground">
+                  Leave a quick note below and we will take you to the full feedback form to capture every detail of your journey.
+                </p>
+                <ul className="space-y-3 text-sm text-muted-foreground">
+                  <li className="flex items-start gap-3">
+                    <Sparkles className="mt-1 h-4 w-4 text-accent" />
+                    Honest stories inspire new boutique routes and local partnerships.
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <Users className="mt-1 h-4 w-4 text-accent" />
+                    Every review is shared with your guide so they can celebrate wins and refine the details.
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <Compass className="mt-1 h-4 w-4 text-accent" />
+                    We protect your privacy and only publish feedback with your permission.
+                  </li>
+                </ul>
+                <div className="flex flex-wrap items-center justify-center gap-3 lg:justify-start">
+                  <Button asChild size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90">
+                    <Link href="/feedback">Open full feedback form</Link>
+                  </Button>
+                  <Button asChild variant="ghost">
+                    <Link href="/reviews">Browse traveller stories</Link>
+                  </Button>
+                </div>
+              </div>
             </div>
-            <div className="text-center md:text-left">
-              <h2 className="text-3xl md:text-4xl font-headline font-bold">Your Voice Matters</h2>
-              <p className="mt-4 text-lg text-muted-foreground">
-                Every piece of feedback is a stepping stone to a better experience. Your reviews help us refine our tours and guide future travellers.
-              </p>
-              <Button asChild size="lg" className="mt-6 bg-primary text-primary-foreground hover:bg-primary/90">
-                <Link href="/feedback">Share Your Experience</Link>
-              </Button>
-            </div>
+            <HomeFeedbackForm />
           </div>
         </div>
       </section>

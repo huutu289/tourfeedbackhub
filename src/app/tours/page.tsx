@@ -1,89 +1,73 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import TourCard from '@/components/tour-card';
 import { getPublicContent } from '@/lib/content-service';
+import ToursExplorer from '@/components/tours-explorer';
 
 export default async function ToursPage() {
-  const { tours, tourTypes } = await getPublicContent();
+  const { tours, tourTypes, reviews } = await getPublicContent();
   const finishedTours = tours.filter((tour) => tour.status === 'finished');
-  const tourTypeMap = new Map(tourTypes.map((type) => [type.id, type.title]));
+
+  const ratingTotals = new Map<string, { total: number; count: number }>();
+  reviews
+    .filter((review) => review.status === 'approved' && review.tourId)
+    .forEach((review) => {
+      if (!review.tourId) return;
+      const current = ratingTotals.get(review.tourId) ?? { total: 0, count: 0 };
+      ratingTotals.set(review.tourId, {
+        total: current.total + review.rating,
+        count: current.count + 1,
+      });
+    });
+
+  const serialisedTours = finishedTours.map((tour) => {
+    const rating = ratingTotals.get(tour.id);
+    const start = tour.startDate instanceof Date ? tour.startDate : new Date(tour.startDate);
+    const end = tour.endDate instanceof Date ? tour.endDate : new Date(tour.endDate);
+    const durationDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+    return {
+      id: tour.id,
+      name: tour.name,
+      summary: tour.summary,
+      code: tour.code,
+      startDate: start.toISOString(),
+      endDate: end.toISOString(),
+      clientCity: tour.clientCity,
+      clientCountry: tour.clientCountry,
+      clientCount: tour.clientCount,
+      clientNationalities: tour.clientNationalities,
+      durationDays,
+      photoUrl: tour.photoUrls?.[0] ?? null,
+      tourTypeIds: tour.tourTypeIds ?? [],
+      provinces: tour.provinces ?? [],
+      guideName: tour.guideName,
+      guideLanguages: tour.guideLanguages ?? [],
+      itinerary: tour.itinerary,
+      rating: rating && rating.count > 0
+        ? { average: rating.total / rating.count, count: rating.count }
+        : null,
+    };
+  });
+
+  const serialisedTourTypes = tourTypes.map((type) => ({
+    id: type.id,
+    title: type.title,
+    icon: type.icon,
+  }));
 
   return (
-    <div className="py-16 md:py-24">
+    <div className="bg-background py-16 md:py-24">
       <div className="container mx-auto px-4">
-        <div className="text-center max-w-3xl mx-auto">
-          <h1 className="text-4xl md:text-5xl font-headline font-bold">Finished Tour Diaries</h1>
+        <div className="mx-auto max-w-3xl text-center">
+          <span className="inline-flex items-center justify-center rounded-full border border-border/60 bg-secondary/30 px-4 py-1 text-xs uppercase tracking-[0.3em] text-muted-foreground">
+            Finished diaries
+          </span>
+          <h1 className="mt-4 text-4xl md:text-5xl font-headline font-bold">Explore recent bespoke tours</h1>
           <p className="mt-4 text-lg text-muted-foreground">
-            Browse recent bespoke journeys, discover day-by-day highlights, and see how travellers rated their guide.
+            Filter by style, travel dates, and region to uncover the journeys our guides recently completed across Vietnam.
           </p>
         </div>
 
-        {finishedTours.length > 0 ? (
-          <div className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-            {finishedTours.map((tour) => (
-              <TourCard key={tour.id} tour={tour} />
-            ))}
-          </div>
-        ) : (
-          <p className="mt-12 text-center text-muted-foreground">
-            Completed journeys will appear here once published by the team.
-          </p>
-        )}
-
-        {finishedTours.length > 0 && (
-          <div className="mt-16 space-y-6">
-            <h2 className="text-2xl font-headline font-semibold">Diary snapshots</h2>
-            {finishedTours.map((tour) => (
-              <Card key={`${tour.id}-details`} className="bg-card/50">
-                <CardHeader>
-                  <CardTitle className="text-xl font-headline">{tour.name}</CardTitle>
-                  <div className="flex flex-wrap gap-2 mt-2 text-xs uppercase tracking-wide text-muted-foreground">
-                    <Badge variant="outline">{tour.code}</Badge>
-                    <Badge variant="outline">
-                      {tour.startDate.toLocaleDateString()} – {tour.endDate.toLocaleDateString()}
-                    </Badge>
-                    <Badge variant="outline">{tour.clientCount} guests</Badge>
-                    <Badge variant="secondary">Guide {tour.guideName}</Badge>
-                    {tour.tourTypeIds?.map((typeId) => (
-                      <Badge key={typeId} variant="outline">
-                        {tourTypeMap.get(typeId) ?? 'Experience'}
-                      </Badge>
-                    ))}
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-muted-foreground leading-relaxed">{tour.summary}</p>
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground/80">Traveller nationalities</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {tour.clientNationalities.join(', ') || 'Not recorded'}
-                    </p>
-                  </div>
-                  {tour.provinces?.length ? (
-                    <div>
-                      <h3 className="text-sm font-semibold text-foreground/80">Provinces visited</h3>
-                      <p className="text-sm text-muted-foreground">{tour.provinces.join(', ')}</p>
-                    </div>
-                  ) : null}
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground/80">Guide feedback</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {tour.guideLanguages?.length
-                        ? `Guide ${tour.guideName} leads in ${tour.guideLanguages.join(', ')}. Travellers rate the guide after each journey — open the diary to read their comments.`
-                        : 'Travellers rate the guide after each journey — open the diary to read their comments.'}
-                    </p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground/80">Itinerary</h3>
-                    <div className="mt-2 whitespace-pre-line text-sm text-muted-foreground leading-relaxed">
-                      {tour.itinerary}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+        <div className="mt-12">
+          <ToursExplorer tours={serialisedTours} tourTypes={serialisedTourTypes} />
+        </div>
       </div>
     </div>
   );

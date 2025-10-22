@@ -30,6 +30,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useAdmin } from '@/hooks/use-admin';
+import HeaderSearch from '@/components/header-search';
 import type {
   NavigationAudience,
   NavigationMenuItem as NavigationMenuEntry,
@@ -47,6 +48,17 @@ const ADMIN_LINK = {
   href: '/admin/dashboard',
   label: 'CMS',
 };
+
+const CORE_NAV_ITEMS: NavigationMenuEntry[] = [
+  { id: 'core-home', label: 'Home', href: '/', type: 'internal', order: 1 },
+  { id: 'core-tours', label: 'Tours', href: '/tours', type: 'internal', order: 2 },
+  { id: 'core-tour-styles', label: 'Tour Styles', href: '/tour-types', type: 'internal', order: 3 },
+  { id: 'core-diaries', label: 'Diaries', href: '/finished-tours', type: 'internal', order: 4 },
+  { id: 'core-stories', label: 'Stories', href: '/stories', type: 'internal', order: 5 },
+  { id: 'core-blog', label: 'Blog', href: '/blog', type: 'internal', order: 6 },
+  { id: 'core-reviews', label: 'Reviews', href: '/reviews', type: 'internal', order: 7 },
+  { id: 'core-feedback', label: 'Feedback', href: '/feedback', type: 'internal', order: 8 },
+];
 
 function resolveIcon(name?: string): IconComponent | undefined {
   if (!name) return undefined;
@@ -273,6 +285,30 @@ function findCtaItem(items: NavigationMenuEntry[]): NavigationMenuEntry | undefi
   return items.find((item) => item.group === 'cta');
 }
 
+function ensureCoreNavigation(items: NavigationMenuEntry[]): NavigationMenuEntry[] {
+  const normalisedHref = (href: string) => normaliseHref(href).replace(/\/$/, '') || '/';
+  const existing = new Set(items.map((item) => normalisedHref(item.href)));
+  const maxOrder = items.reduce((acc, item) => Math.max(acc, item.order ?? 0), 0);
+
+  let currentOrder = maxOrder + 1;
+  const enriched: NavigationMenuEntry[] = items.map((item) => ({
+    ...item,
+    order: item.order ?? currentOrder++,
+  }));
+
+  CORE_NAV_ITEMS.forEach((coreItem, index) => {
+    const hrefKey = normalisedHref(coreItem.href);
+    if (!existing.has(hrefKey)) {
+      enriched.push({
+        ...coreItem,
+        order: currentOrder + index,
+      });
+    }
+  });
+
+  return sortByOrder(enriched);
+}
+
 function separateMenuItems(items: NavigationMenuEntry[]) {
   const cta = findCtaItem(items);
   const primary = cta ? items.filter((item) => item.id !== cta.id) : items;
@@ -299,7 +335,7 @@ export default function Header({ menu, siteSettings }: HeaderProps) {
   const { isAdmin, user } = useAdmin();
   const isAdminRoute = pathname.startsWith('/admin');
   const audience = deriveAudience(isAdmin, Boolean(user));
-  const filteredMenu = useFilteredMenu(menu, audience);
+  const filteredMenu = useFilteredMenu(ensureCoreNavigation(menu), audience);
   const { primary, cta } = separateMenuItems(filteredMenu);
   const activePath = useActivePath(pathname);
 
@@ -353,6 +389,8 @@ export default function Header({ menu, siteSettings }: HeaderProps) {
         ) : null}
 
         <div className="flex flex-1 items-center justify-end gap-2">
+          <HeaderSearch />
+
           {isAdmin ? (
             <Button asChild variant="secondary" className="hidden md:flex">
               <Link href={ADMIN_LINK.href}>

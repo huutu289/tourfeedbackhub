@@ -17,7 +17,7 @@ function isInternalLink(href: string): boolean {
 
 function clampOpacity(value: number | null | undefined): number {
   if (typeof value !== 'number' || Number.isNaN(value)) {
-    return 0.5;
+    return 0.35;
   }
   return Math.min(1, Math.max(0, value));
 }
@@ -187,7 +187,7 @@ export default function HeroCarousel({ slides }: HeroCarouselProps) {
                       src={slide.imageUrl}
                       alt={slide.alt ?? slide.title}
                       fill
-                      className="relative object-cover md:object-contain object-center z-10"
+                      className="relative object-cover object-center z-10"
                       priority={index === 0}
                       sizes="100vw"
                       quality={90}
@@ -198,7 +198,7 @@ export default function HeroCarousel({ slides }: HeroCarouselProps) {
                   {/* Gradient Overlay with CMS Opacity */}
                   <div className="absolute inset-0 pointer-events-none z-20" aria-hidden="true">
                     <div
-                      className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60"
+                      className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/40 to-black/60"
                       style={{ opacity: overlayStrength }}
                     />
                   </div>
@@ -211,63 +211,87 @@ export default function HeroCarousel({ slides }: HeroCarouselProps) {
                       transition={{ duration: 0.6, ease: 'easeOut' }}
                       className="w-full max-w-7xl"
                     >
-                      <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 md:gap-6">
+                      <div className="flex w-full flex-wrap items-center justify-center gap-3 sm:gap-4 md:gap-6 lg:gap-8">
                         {/* Title */}
-                        <h1 
-                          className="font-headline text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-white leading-tight"
-                          style={{
-                            textShadow: '0 2px 8px rgba(0,0,0,0.8), 0 4px 16px rgba(0,0,0,0.6), 0 1px 3px rgba(0,0,0,0.9)'
-                          }}
-                        >
-                          {slide.title}
-                        </h1>
+                        <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:text-left">
+                          <span className="inline-flex items-center rounded-full border border-white/40 bg-white/10 px-4 py-1 text-xs uppercase tracking-[0.3em] text-white/80 backdrop-blur">
+                            Guiding Boutique Adventures Across Vietnam
+                          </span>
+                          <h1
+                            className="font-headline text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-white leading-tight drop-shadow-[0_6px_20px_rgba(0,0,0,0.7)]"
+                          >
+                            {slide.title}
+                          </h1>
+                        </div>
 
                         {/* Subtitle */}
                         {slide.subtitle && (
-                          <>
-                            <span className="hidden sm:inline text-white/70 text-xl font-light" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>•</span>
-                            <p 
-                              className="font-body text-sm sm:text-base md:text-lg lg:text-xl text-white"
-                              style={{
-                                textShadow: '0 2px 6px rgba(0,0,0,0.8), 0 4px 12px rgba(0,0,0,0.5)'
-                              }}
-                            >
-                              {slide.subtitle}
-                            </p>
-                          </>
+                          <p
+                            className="font-body text-sm sm:text-base md:text-lg lg:text-xl text-white/90 backdrop-blur-sm rounded-full bg-black/30 px-4 py-2"
+                          >
+                            {slide.subtitle}
+                          </p>
                         )}
 
                         {/* CTA Button */}
-                        {slide.buttonText && slide.buttonLink && (
-                          <motion.div
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            transition={{ duration: 0.2 }}
-                          >
+                        <div className="flex flex-wrap items-center justify-center gap-3">
+                          {slide.buttonText && slide.buttonLink ? (
+                            <motion.div
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              transition={{ duration: 0.2 }}
+                            >
+                              <Button
+                                asChild
+                                size="lg"
+                                className="group rounded-full h-10 sm:h-11 md:h-12 lg:h-14 bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-2xl shadow-xl text-sm sm:text-base md:text-lg font-semibold transition-all duration-300 px-5 sm:px-7 md:px-9 lg:px-11"
+                              >
+                                {isInternal ? (
+                                  <Link href={slide.buttonLink} className="flex items-center justify-center gap-1.5">
+                                    {slide.buttonText}
+                                    <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                                  </Link>
+                                ) : (
+                                  <a
+                                    href={slide.buttonLink}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="flex items-center justify-center gap-1.5"
+                                  >
+                                    {slide.buttonText}
+                                    <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                                  </a>
+                                )}
+                              </Button>
+                            </motion.div>
+                          ) : null}
+                          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} transition={{ duration: 0.2 }}>
                             <Button
                               asChild
                               size="lg"
-                              className="group rounded-full h-10 sm:h-11 md:h-12 lg:h-14 bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-2xl shadow-xl text-sm sm:text-base md:text-lg font-semibold transition-all duration-300 px-5 sm:px-7 md:px-9 lg:px-11"
+                              variant="secondary"
+                              className="rounded-full bg-white/20 text-white hover:bg-white/30"
                             >
-                              {isInternal ? (
-                                <Link href={slide.buttonLink} className="flex items-center justify-center gap-1.5">
-                                  {slide.buttonText}
-                                  <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-                                </Link>
-                              ) : (
-                                <a
-                                  href={slide.buttonLink}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="flex items-center justify-center gap-1.5"
-                                >
-                                  {slide.buttonText}
-                                  <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-                                </a>
-                              )}
+                              <Link href="/tours" className="flex items-center gap-2">
+                                Explore Tours
+                                <ArrowRight className="h-4 w-4" />
+                              </Link>
                             </Button>
                           </motion.div>
-                        )}
+                          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} transition={{ duration: 0.2 }}>
+                            <Button
+                              asChild
+                              size="lg"
+                              variant="ghost"
+                              className="rounded-full border border-white/40 text-white hover:bg-white/10"
+                            >
+                              <Link href="/stories" className="flex items-center gap-2">
+                                See Diaries
+                                <ArrowRight className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                          </motion.div>
+                        </div>
                       </div>
                     </motion.div>
                   </div>

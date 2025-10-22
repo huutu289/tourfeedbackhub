@@ -38,6 +38,8 @@ export interface Story {
   coverImageUrl: string;
   publishedAt: Date;
   readTimeMinutes?: number;
+  tags?: string[];
+  category?: string;
 }
 
 export interface Review {

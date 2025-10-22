@@ -145,6 +145,15 @@ export default function BlogPage() {
     currentPage * POSTS_PER_PAGE
   );
 
+  const featuredPost = filteredPosts[0];
+  const trendingPosts = useMemo(() => {
+    const postsWithoutFeatured = filteredPosts.slice(1);
+    return postsWithoutFeatured
+      .slice()
+      .sort((a, b) => (b.viewCount ?? 0) - (a.viewCount ?? 0))
+      .slice(0, 3);
+  }, [filteredPosts]);
+
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:9002';
 
   return (
@@ -229,94 +238,130 @@ export default function BlogPage() {
 
         {/* Posts Grid */}
         {!postsLoading && paginatedPosts.length > 0 && (
-          <>
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
-              {paginatedPosts.map((post) => (
-                <Link key={post.id} href={`/blog/${post.slug}`}>
-                  <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer overflow-hidden">
-                    {/* Featured Image */}
-                    {post.featuredImage?.url && (
-                      <div className="aspect-video relative overflow-hidden bg-muted">
-                        <img
-                          src={post.featuredImage.url}
-                          alt={post.featuredImage.altText || post.title}
-                          className="object-cover w-full h-full hover:scale-105 transition-transform duration-300"
-                        />
-                      </div>
-                    )}
-
-                    <CardHeader>
-                      {/* Categories */}
-                      {post.categories && post.categories.length > 0 && (
-                        <div className="flex gap-2 mb-2">
-                          {post.categories.slice(0, 2).map((cat) => (
-                            <Badge key={cat.id} variant="secondary" className="text-xs">
-                              {cat.name}
-                            </Badge>
-                          ))}
+          <div className="grid gap-12 lg:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]">
+            <div className="space-y-8">
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
+                {paginatedPosts.map((post) => (
+                  <Link key={post.id} href={`/blog/${post.slug}`}>
+                    <Card className="h-full cursor-pointer overflow-hidden transition-shadow hover:shadow-lg">
+                      {post.featuredImage?.url && (
+                        <div className="relative aspect-video overflow-hidden bg-muted">
+                          <img
+                            src={post.featuredImage.url}
+                            alt={post.featuredImage.altText || post.title}
+                            className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+                          />
                         </div>
                       )}
+                      <CardHeader>
+                        {post.categories && post.categories.length > 0 && (
+                          <div className="mb-2 flex gap-2">
+                            {post.categories.slice(0, 2).map((cat) => (
+                              <Badge key={cat.id} variant="secondary" className="text-xs">
+                                {cat.name}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                        <h2 className="text-xl font-semibold leading-tight line-clamp-2 transition-colors hover:text-primary">
+                          {post.title}
+                        </h2>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground line-clamp-3">
+                          {post.excerpt || post.content.slice(0, 140)}
+                        </p>
+                      </CardContent>
+                      <CardFooter className="flex items-center justify-between text-sm text-muted-foreground">
+                        <div className="flex items-center gap-2">
+                          <User className="h-3 w-3" />
+                          <span>{post.authorName}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-3 w-3" />
+                          <time dateTime={post.createdAt.toISOString()}>
+                            {format(post.publishedAt || post.createdAt, 'MMM d, yyyy')}
+                          </time>
+                        </div>
+                      </CardFooter>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
 
-                      <h2 className="text-xl font-semibold line-clamp-2 hover:text-primary transition-colors">
-                        {post.title}
-                      </h2>
-                    </CardHeader>
-
-                    <CardContent>
-                      {post.excerpt && (
-                        <p className="text-muted-foreground line-clamp-3 text-sm">{post.excerpt}</p>
-                      )}
-                    </CardContent>
-
-                    <CardFooter className="flex items-center justify-between text-sm text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <User className="h-3 w-3" />
-                        <span>{post.authorName}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-3 w-3" />
-                        <time dateTime={post.createdAt.toISOString()}>
-                          {format(post.publishedAt || post.createdAt, 'MMM d, yyyy')}
-                        </time>
-                      </div>
-                    </CardFooter>
-                  </Card>
-                </Link>
-              ))}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setCurrentPage(page)}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
             </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                >
-                  Previous
-                </Button>
-                <div className="flex items-center gap-1">
-                  {Array.from({length: totalPages}, (_, i) => i + 1).map((page) => (
-                    <Button
-                      key={page}
-                      variant={currentPage === page ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setCurrentPage(page)}
-                    >
-                      {page}
-                    </Button>
-                  ))}
+            <aside className="space-y-8">
+              {featuredPost ? (
+                <div className="rounded-xl border border-border/60 bg-background/70 p-6 shadow-sm">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Featured story</h3>
+                  <Link href={`/blog/${featuredPost.slug}`} className="mt-2 block text-lg font-headline leading-snug hover:text-primary">
+                    {featuredPost.title}
+                  </Link>
+                  {featuredPost.excerpt ? (
+                    <p className="mt-2 text-sm text-muted-foreground line-clamp-4">{featuredPost.excerpt}</p>
+                  ) : null}
+                  <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+                    <Calendar className="h-3 w-3" />
+                    <time dateTime={(featuredPost.publishedAt || featuredPost.createdAt).toISOString()}>
+                      {format(featuredPost.publishedAt || featuredPost.createdAt, 'MMM d, yyyy')}
+                    </time>
+                  </div>
                 </div>
-                <Button
-                  variant="outline"
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  Next
-                </Button>
-              </div>
-            )}
-          </>
+              ) : null}
+
+              {trendingPosts.length > 0 ? (
+                <div className="rounded-xl border border-border/60 bg-background/70 p-6 shadow-sm">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Trending now</h3>
+                  <ul className="mt-4 space-y-3 text-sm">
+                    {trendingPosts.map((post) => (
+                      <li key={post.id} className="space-y-1">
+                        <Link href={`/blog/${post.slug}`} className="block font-medium leading-snug hover:text-primary">
+                          {post.title}
+                        </Link>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Calendar className="h-3 w-3" />
+                          <time dateTime={(post.publishedAt || post.createdAt).toISOString()}>
+                            {format(post.publishedAt || post.createdAt, 'MMM d, yyyy')}
+                          </time>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </aside>
+          </div>
         )}
 
         {/* Empty State */}
