@@ -18,23 +18,31 @@ export const getFinishedTourComments = cache(async (tourId: string): Promise<Fin
   const admin = initializeFirebaseAdmin();
   if (!admin) return [];
 
-  const snapshot = await admin.firestore
-    .collection("tours")
-    .doc(tourId)
-    .collection("comments")
-    .orderBy("createdAt", "desc")
-    .get();
+  try {
+    const snapshot = await admin.firestore
+      .collection("reviews")
+      .where("reviewType", "==", "finishedTour")
+      .get();
 
-  return snapshot.docs.map((doc) => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      tourId,
-      authorName: data.authorName ?? data.name ?? "Anonymous",
-      rating: typeof data.rating === "number" ? data.rating : Number(data.rating) || 0,
-      message: data.message ?? "",
-      createdAt: toDate(data.createdAt ?? Date.now()),
-    } satisfies FinishedTourComment;
-  });
+    const approved = snapshot.docs
+      .map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          tourId: data.tourId ?? tourId,
+          authorName: data.authorDisplay ?? data.name ?? "Anonymous",
+          rating: typeof data.rating === "number" ? data.rating : Number(data.rating) || 0,
+          message: data.message ?? "",
+          createdAt: toDate(data.createdAt ?? Date.now()),
+          status: data.status ?? "pending",
+        };
+      })
+      .filter((item) => item.tourId === tourId && item.status === "approved")
+      .map(({ status: _status, ...rest }) => rest as FinishedTourComment);
+
+    return approved.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  } catch (error) {
+    console.error("Failed to load finished tour comments", error);
+    return [];
+  }
 });
-

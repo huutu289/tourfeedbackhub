@@ -52,12 +52,10 @@ export function MultiSelect({
     onChange(Array.from(next));
   };
 
-  const displayValue =
-    value.length > 0
-      ? options
-          .filter((option) => selectedSet.has(option.value))
-          .map((option) => option.label)
-      : [];
+  const selectedOptions = useMemo(() => {
+    if (value.length === 0) return [];
+    return options.filter((option) => selectedSet.has(option.value));
+  }, [options, selectedSet, value.length]);
 
   return (
     <Popover>
@@ -68,14 +66,14 @@ export function MultiSelect({
           aria-expanded="false"
           className={cn(
             "w-full justify-between",
-            displayValue.length === 0 && "text-muted-foreground"
+            selectedOptions.length === 0 && "text-muted-foreground"
           )}
         >
           <div className="flex flex-wrap gap-1">
-            {displayValue.length ? (
-              displayValue.map((label) => (
-                <Badge key={label} variant="secondary">
-                  {label}
+            {selectedOptions.length ? (
+              selectedOptions.map((option) => (
+                <Badge key={option.value} variant="secondary">
+                  {option.label}
                 </Badge>
               ))
             ) : (

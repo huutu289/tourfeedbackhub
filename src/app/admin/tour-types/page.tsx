@@ -180,15 +180,17 @@ export default function AdminTourTypesPage() {
       ? selectedTourType.id
       : doc(collection(firestore, "tourTypes")).id;
 
+    const trimmedIcon = values.icon?.trim();
+
     const payload: TourType = {
       id,
       title: values.title.trim(),
       description: values.description.trim(),
-      icon: values.icon?.trim() || undefined,
       order:
         typeof values.order === "number" && !Number.isNaN(values.order)
           ? values.order
           : tourTypes.length + 1,
+      ...(trimmedIcon ? { icon: trimmedIcon } : {}),
     };
 
     await setDoc(doc(firestore, "tourTypes", id), payload, { merge: true });

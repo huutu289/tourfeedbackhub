@@ -1,14 +1,18 @@
 import { cache } from "react";
 import { initializeFirebaseAdmin } from "@/firebase/admin";
-import {
-  siteSettings as fallbackSiteSettings,
-  tourTypes as fallbackTourTypes,
-  tours as fallbackTours,
-  stories as fallbackStories,
-  reviews as fallbackReviews,
-  heroSlides as fallbackHeroSlides,
-} from "@/lib/data";
-import type { PublicContent, Review, SiteSettings, Story, Tour, TourType, HeroSlide } from "@/lib/types";
+import { siteSettings as fallbackSiteSettings } from "@/lib/data";
+import type {
+  PublicContent,
+  Review,
+  SiteSettings,
+  Story,
+  Tour,
+  TourType,
+  HeroSlide,
+  Post,
+  PostStatus,
+  PostType,
+} from "@/lib/types";
 
 interface FirestoreDocument {
   id: string;
@@ -180,6 +184,53 @@ function mapReview(doc: FirestoreDocument): Review {
     status: data.status ?? "approved",
     createdAt: toDate(data.createdAt ?? data.publishedAt ?? Date.now()),
     summary: data.summary ?? undefined,
+    reviewType: typeof data.reviewType === "string" ? data.reviewType : undefined,
+  };
+}
+
+function mapPost(doc: FirestoreDocument): Post {
+  const { data } = doc;
+  const rawStatus = typeof data.status === "string" ? data.status.toLowerCase() : "draft";
+  const allowedStatuses: PostStatus[] = ["draft", "published", "scheduled", "private", "trash"];
+  const status: PostStatus = allowedStatuses.includes(rawStatus as PostStatus)
+    ? (rawStatus as PostStatus)
+    : "draft";
+
+  const rawType = typeof data.type === "string" ? data.type.toLowerCase() : "post";
+  const type: PostType = rawType === "page" ? "page" : "post";
+
+  const categoryIds = Array.isArray(data.categoryIds)
+    ? data.categoryIds.filter((value: unknown): value is string => typeof value === "string")
+    : [];
+  const tagIds = Array.isArray(data.tagIds)
+    ? data.tagIds.filter((value: unknown): value is string => typeof value === "string")
+    : [];
+
+  return {
+    id: doc.id,
+    type,
+    title: typeof data.title === "string" ? data.title : "Untitled",
+    slug: typeof data.slug === "string" && data.slug.trim() ? data.slug : doc.id,
+    content: typeof data.content === "string" ? data.content : "",
+    excerpt: typeof data.excerpt === "string" ? data.excerpt : "",
+    status,
+    featuredImageId: typeof data.featuredImageId === "string" ? data.featuredImageId : undefined,
+    featuredImage: typeof data.featuredImage === "object" ? data.featuredImage : undefined,
+    authorId: typeof data.authorId === "string" ? data.authorId : "unknown",
+    authorName: typeof data.authorName === "string" ? data.authorName : "Unknown",
+    categoryIds,
+    tagIds,
+    tags: Array.isArray(data.tags) ? data.tags : undefined,
+    publishedAt: toOptionalDate(data.publishedAt ?? data.createdAt) ?? null,
+    scheduledFor: toOptionalDate(data.scheduledFor),
+    createdAt: toDate(data.createdAt ?? data.publishedAt ?? Date.now()),
+    updatedAt: toDate(data.updatedAt ?? data.createdAt ?? Date.now()),
+    viewCount: typeof data.viewCount === "number" ? data.viewCount : Number(data.viewCount) || 0,
+    commentCount:
+      typeof data.commentCount === "number" ? data.commentCount : Number(data.commentCount) || 0,
+    allowComments: data.allowComments !== false,
+    seo: typeof data.seo === "object" ? data.seo : undefined,
+    locale: typeof data.locale === "string" ? data.locale : undefined,
   };
 }
 
@@ -240,6 +291,18 @@ async function fetchApprovedReviews(): Promise<Review[]> {
   return snapshot.docs.map((doc) => mapReview({ id: doc.id, data: doc.data() }));
 }
 
+async function fetchPublishedPosts(): Promise<FirestoreDocument[]> {
+  const admin = initializeFirebaseAdmin();
+  if (!admin) return [];
+  const snapshot = await admin.firestore
+    .collection("posts")
+    .orderBy("publishedAt", "desc")
+    .limit(6)
+    .get();
+
+  return snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
+}
+
 async function fetchSiteSettings(): Promise<SiteSettings> {
   const admin = initializeFirebaseAdmin();
   if (!admin) return fallbackSiteSettings;
@@ -253,23 +316,26 @@ async function fetchSiteSettings(): Promise<SiteSettings> {
 }
 
 async function fetchPublicContent(): Promise<PublicContent> {
-  const [settings, tourTypeDocs, tourDocs, storyDocs, reviewDocs, slideDocs] = await Promise.all([
-    fetchSiteSettings(),
-    fetchCollection("tourTypes"),
-    fetchCollection("tours"),
-    fetchCollection("stories"),
-    fetchApprovedReviews(),
-    fetchCollection("siteContentSlides"),
-  ]);
+  const [settings, tourTypeDocs, tourDocs, storyDocs, reviewDocs, slideDocs, publishedPosts] =
+    await Promise.all([
+      fetchSiteSettings(),
+      fetchCollection("tourTypes"),
+      fetchCollection("tours"),
+      fetchCollection("stories"),
+      fetchApprovedReviews(),
+      fetchCollection("siteContentSlides"),
+      fetchPublishedPosts(),
+    ]);
 
-  const mappedTourTypes = tourTypeDocs.length ? tourTypeDocs.map(mapTourType) : fallbackTourTypes;
-  const mappedTours = (tourDocs.length ? tourDocs.map(mapTour) : fallbackTours).filter(
-    (tour) => tour.status === "finished"
-  );
-  const mappedStories = storyDocs.length ? storyDocs.map(mapStory) : fallbackStories;
-  const mappedReviews = reviewDocs.length ? reviewDocs : fallbackReviews;
+  const mappedTourTypes = tourTypeDocs.map(mapTourType);
+  const mappedTours = tourDocs.map(mapTour).filter((tour) => tour.status === "finished");
+  const mappedStories = storyDocs.map(mapStory);
+  const mappedReviews = reviewDocs;
+  const mappedPosts = publishedPosts
+    .map(mapPost)
+    .filter((post) => post.type === "post" && post.status === "published");
   const now = new Date();
-  const mappedSlidesRaw = slideDocs.length ? slideDocs.map(mapSlide) : [];
+  const mappedSlidesRaw = slideDocs.map(mapSlide);
   const mappedSlides = mappedSlidesRaw
     .filter((slide) => isSlideLive(slide, now))
     .sort((a, b) => {
@@ -278,7 +344,7 @@ async function fetchPublicContent(): Promise<PublicContent> {
       }
       return a.order - b.order;
     });
-  const slides = mappedSlides.length ? mappedSlides : fallbackHeroSlides;
+  const slides = mappedSlides;
 
   return {
     siteSettings: settings,
@@ -287,6 +353,7 @@ async function fetchPublicContent(): Promise<PublicContent> {
     stories: mappedStories,
     reviews: mappedReviews,
     slides,
+    posts: mappedPosts,
   };
 }
 
@@ -297,11 +364,12 @@ export const getPublicContent = cache(async (): Promise<PublicContent> => {
     console.warn("Falling back to local content because Firestore could not be reached", error);
     return {
       siteSettings: fallbackSiteSettings,
-      tourTypes: fallbackTourTypes,
-      tours: fallbackTours,
-      stories: fallbackStories,
-      reviews: fallbackReviews.filter((review) => review.status === "approved"),
-      slides: fallbackHeroSlides,
+      tourTypes: [],
+      tours: [],
+      stories: [],
+      reviews: [],
+      slides: [],
+      posts: [],
     };
   }
 });

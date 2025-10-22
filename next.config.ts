@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  // Allow LAN/mobile access during development
+  // Note: allowedDevOrigins may have limited support for IP patterns
+  // You may need to add your specific LAN IP address if warnings persist
+  // Example: 'http://192.168.1.100:9002'
   images: {
     remotePatterns: [
       {

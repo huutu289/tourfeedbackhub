@@ -322,7 +322,7 @@ This deploys:
 
 ### Issue: "Unauthorized" when approving feedback
 **Solution**:
-- Verify your user UID is in `/admins` collection
+- Verify your user document in `/users` lists `role: "admin"`
 - Check that custom claims script ran successfully: `node scripts/add-admin-users.js`
 - Check browser console for auth errors
 

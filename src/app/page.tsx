@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, Star, Compass } from 'lucide-react';
+import { format } from 'date-fns';
+import { ArrowRight, Star, Compass, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,15 +11,26 @@ import { getPublicContent } from '@/lib/content-service';
 import HeroCarousel from '@/components/hero-carousel';
 
 export default async function Home() {
-  const { siteSettings, tours, reviews, tourTypes, stories, slides } = await getPublicContent();
+  const { siteSettings, tours, reviews, tourTypes, stories, slides, posts } = await getPublicContent();
   const finishedTours = tours.filter((tour) => tour.status === 'finished');
+  const sortedDiaries = [...finishedTours].sort(
+    (a, b) => b.startDate.getTime() - a.startDate.getTime()
+  );
+  const recentDiaries = sortedDiaries.slice(0, 3);
   const approvedReviews = reviews.filter((review) => review.status === 'approved').slice(0, 3);
   const defaultLocale = (siteSettings.defaultLanguage ?? 'en').toLowerCase();
   const slidesForLocale = slides.filter((slide) => slide.locale.toLowerCase() === defaultLocale);
   const heroSlides = slidesForLocale.length ? slidesForLocale : slides;
   const primarySlide = heroSlides[0];
   const heroImage = primarySlide?.imageUrl ?? siteSettings.heroMediaUrl;
-  const featuredStory = stories.at(0);
+  const sortedStories = [...stories].sort(
+    (a, b) => b.publishedAt.getTime() - a.publishedAt.getTime()
+  );
+  const [featuredStory, ...remainingStories] = sortedStories;
+  const recentStories = (remainingStories.length ? remainingStories : sortedStories).slice(0, 3);
+  const recentPosts = posts
+    .filter((post) => post.status === 'published' && post.type === 'post')
+    .slice(0, 3);
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -104,13 +116,13 @@ export default async function Home() {
 
       <section id="tours" className="py-16 md:py-24 bg-background">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-headline font-bold text-center">Popular Tours</h2>
+          <h2 className="text-3xl md:text-4xl font-headline font-bold text-center">Latest Tour Diaries</h2>
           <p className="mt-4 text-center max-w-2xl mx-auto text-muted-foreground">
-            Explore traveller favourites curated from heartfelt feedback.
+            Explore freshly wrapped journeys, see where guests ventured, and open the diary for day-by-day highlights.
           </p>
-          {finishedTours.length > 0 ? (
+          {recentDiaries.length > 0 ? (
             <div className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-              {finishedTours.slice(0, 3).map((tour) => (
+              {recentDiaries.map((tour) => (
                 <TourCard key={tour.id} tour={tour} />
               ))}
             </div>
@@ -119,8 +131,143 @@ export default async function Home() {
               Finished journey highlights will appear here once published.
             </p>
           )}
+          {recentDiaries.length > 0 && (
+            <div className="mt-12 text-center">
+              <Button asChild variant="outline">
+                <Link href="/tours">
+                  View all diaries <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+          )}
         </div>
       </section>
+
+      {recentStories.length > 0 && (
+        <section id="stories" className="py-16 md:py-24 bg-secondary/20">
+          <div className="container mx-auto px-4">
+            <div className="flex flex-col items-center text-center">
+              <h2 className="text-3xl md:text-4xl font-headline font-bold">Latest Stories</h2>
+              <p className="mt-4 max-w-2xl text-muted-foreground">
+                Narrative snapshots from guides and travellers, curated to inspire the next journey.
+              </p>
+            </div>
+            <div className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+              {recentStories.map((story) => {
+                const storyDate = format(story.publishedAt, 'MMM d, yyyy');
+                return (
+                  <Card key={story.id} className="flex h-full flex-col overflow-hidden">
+                    {story.coverImageUrl && (
+                      <div className="relative h-48 w-full">
+                        <Image
+                          src={story.coverImageUrl}
+                          alt={story.title}
+                          fill
+                          className="object-cover"
+                          sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+                        />
+                      </div>
+                    )}
+                    <CardHeader>
+                      <div className="flex items-center justify-between text-sm text-muted-foreground">
+                        <span>{storyDate}</span>
+                        {typeof story.readTimeMinutes === 'number' && story.readTimeMinutes > 0 && (
+                          <span>{story.readTimeMinutes} min read</span>
+                        )}
+                      </div>
+                      <CardTitle className="mt-2 text-2xl font-headline leading-tight">{story.title}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex-grow">
+                      <p className="text-sm text-muted-foreground leading-relaxed">{story.excerpt}</p>
+                    </CardContent>
+                    <CardFooter>
+                      <Button asChild variant="ghost" className="px-0 text-sm">
+                        <Link href="/stories" className="flex items-center gap-2">
+                          Read the story
+                          <ChevronRight className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                );
+              })}
+            </div>
+            <div className="mt-12 text-center">
+              <Button asChild variant="outline">
+                <Link href="/stories">
+                  Explore stories <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {recentPosts.length > 0 && (
+        <section id="blog" className="py-16 md:py-24 bg-secondary/40">
+          <div className="container mx-auto px-4">
+            <div className="flex flex-col items-center text-center">
+              <h2 className="text-3xl md:text-4xl font-headline font-bold">Latest from the Blog</h2>
+              <p className="mt-4 max-w-2xl text-muted-foreground">
+                Fresh stories and planning tips from the team and our travellers.
+              </p>
+            </div>
+            <div className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+              {recentPosts.map((post) => {
+                const postDate = post.publishedAt ?? post.updatedAt ?? post.createdAt;
+                const formattedDate = postDate ? format(postDate, 'MMM d, yyyy') : '';
+                const imageUrl = post.featuredImage?.url;
+                return (
+                  <Card key={post.id} className="flex h-full flex-col overflow-hidden">
+                    {imageUrl && (
+                      <div className="relative h-48 w-full">
+                        <Image
+                          src={imageUrl}
+                          alt={post.title}
+                          fill
+                          className="object-cover"
+                          sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+                        />
+                      </div>
+                    )}
+                    <CardHeader>
+                      <div className="flex items-center justify-between text-sm text-muted-foreground">
+                        <span>{formattedDate}</span>
+                        <span>{post.authorName ?? 'Unknown'}</span>
+                      </div>
+                      <CardTitle className="mt-2 text-2xl font-headline leading-tight">
+                        <Link href={`/blog/${post.slug}`} className="hover:underline">
+                          {post.title}
+                        </Link>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex-grow">
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {post.excerpt || post.content.slice(0, 140)}
+                      </p>
+                    </CardContent>
+                    <CardFooter className="flex items-center justify-between">
+                      <Button asChild variant="ghost" className="px-0 text-sm">
+                        <Link href={`/blog/${post.slug}`} className="flex items-center gap-2">
+                          Read more
+                          <ChevronRight className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                );
+              })}
+            </div>
+            <div className="mt-12 text-center">
+              <Button asChild variant="outline">
+                <Link href="/blog">
+                  Explore the blog <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section id="reviews" className="py-16 md:py-24 bg-secondary/50">
         <div className="container mx-auto px-4">

@@ -1,6 +1,29 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+##rule when work with github
+Always ensure:
+
+.env, .env.local, .env.production, firebase-service-account.json, and similar files are excluded in .gitignore.
+
+Any hardcoded keys or secrets must be replaced with environment variables (e.g., process.env.API_KEY).
+
+Before commit, run a quick scan (like git diff) to confirm no secret values appear.
+
+Do not include any .env values in the commit message, PR description, or comments.
+
+If needed, create placeholder values ("YOUR_API_KEY_HERE") for clarity.
+
+⚠️ If you detect sensitive tokens, remove them immediately and regenerate new keys.
+
+Goal: push only safe, clean code with configuration handled through environment variables or secret managers.
+“Before pushing, verify that .gitignore correctly excludes all secret files and ensure no sensitive keys appear in commits.”
+Never commit or push sensitive information (API keys, .env, service accounts). 
+Ensure .env and credentials are listed in .gitignore. 
+Use environment variables instead of hardcoding. 
+Push only clean, non-sensitive code.
+
+
 
 ## Project Overview
 

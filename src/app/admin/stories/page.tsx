@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import type { ChangeEvent } from "react";
 import { format } from "date-fns";
 import {
   AlertDialog,
@@ -51,6 +52,7 @@ import { useMemoFirebase } from "@/firebase/firestore/use-memo-firebase";
 import { useCollection, type WithId } from "@/firebase/firestore/use-collection";
 import type { Story } from "@/lib/types";
 import { requireAppCheckToken } from "@/lib/admin/app-check";
+import { uploadStoryCover } from "@/lib/cloud-functions-client";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { useSearchPagination } from "@/hooks/use-search-pagination";
 import {
@@ -119,6 +121,21 @@ export default function AdminStoriesPage() {
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [isImporting, setIsImporting] = useState(false);
+  const coverImageFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [coverImageFile, setCoverImageFile] = useState<File | null>(null);
+  const [draftStoryId, setDraftStoryId] = useState<string | null>(null);
+
+  const resetCoverImageSelection = () => {
+    if (coverImageFileInputRef.current) {
+      coverImageFileInputRef.current.value = '';
+    }
+    setCoverImageFile(null);
+  };
+
+  const handleCoverFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    setCoverImageFile(file);
+  };
 
   // Column-based search states
   const [titleSearch, setTitleSearch] = useState('');
@@ -186,6 +203,8 @@ export default function AdminStoriesPage() {
       publishedAt: formatDateInput(new Date()),
       readTimeMinutes: 4,
     });
+    resetCoverImageSelection();
+    setDraftStoryId(null);
     setIsDialogOpen(true);
   };
 
@@ -198,6 +217,8 @@ export default function AdminStoriesPage() {
       publishedAt: formatDateInput(story.publishedAt),
       readTimeMinutes: story.readTimeMinutes ?? 4,
     });
+    resetCoverImageSelection();
+    setDraftStoryId(story.id);
     setIsDialogOpen(true);
   };
 
@@ -205,14 +226,31 @@ export default function AdminStoriesPage() {
     setIsSubmitting(true);
     try {
       await requireAppCheckToken();
-      const id = selectedStory ? selectedStory.id : doc(collection(firestore, "stories")).id;
+      const existingId = selectedStory ? selectedStory.id : draftStoryId;
+      const id = existingId ?? doc(collection(firestore, "stories")).id;
+      if (!selectedStory && !draftStoryId) {
+        setDraftStoryId(id);
+      }
       const storyRef = doc(firestore, "stories", id);
+
+      let coverImageUrl = values.coverImageUrl?.trim() ?? "";
+
+      if (coverImageFile) {
+        try {
+          coverImageUrl = await uploadStoryCover(id, coverImageFile);
+        } catch (uploadError) {
+          console.error('Story cover upload failed:', uploadError);
+          throw uploadError instanceof Error
+            ? uploadError
+            : new Error('Failed to upload cover image.');
+        }
+      }
 
       const payload: Story = {
         id,
         title: values.title.trim(),
         excerpt: values.excerpt.trim(),
-        coverImageUrl: values.coverImageUrl?.trim() ?? "",
+        coverImageUrl,
         publishedAt: parseDateInput(values.publishedAt),
         readTimeMinutes:
           typeof values.readTimeMinutes === "number"
@@ -233,6 +271,8 @@ export default function AdminStoriesPage() {
         title: selectedStory ? "Story updated" : "Story created",
         description: `"${payload.title}" has been saved.`,
       });
+      resetCoverImageSelection();
+      setDraftStoryId(null);
       setIsDialogOpen(false);
     } catch (error) {
       const description =
@@ -320,7 +360,7 @@ export default function AdminStoriesPage() {
   };
 
   // Import from file
-  const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportFile = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -640,7 +680,16 @@ export default function AdminStoriesPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog
+        open={isDialogOpen}
+        onOpenChange={(open) => {
+          setIsDialogOpen(open);
+          if (!open) {
+            resetCoverImageSelection();
+            setDraftStoryId(null);
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{selectedStory ? "Edit Story" : "Add Story"}</DialogTitle>
@@ -686,6 +735,20 @@ export default function AdminStoriesPage() {
                   </FormItem>
                 )}
               />
+              <div className="space-y-2">
+                <FormLabel>Upload cover image</FormLabel>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  ref={coverImageFileInputRef}
+                  onChange={handleCoverFileChange}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {coverImageFile
+                    ? `Selected: ${coverImageFile.name}. The file uploads when you save.`
+                    : "Optional. Uploading fills the cover image URL automatically on save."}
+                </p>
+              </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <FormField
                   control={form.control}

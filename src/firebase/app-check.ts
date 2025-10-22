@@ -1,122 +1,181 @@
 "use client";
 
 import { initializeAppCheck, ReCaptchaV3Provider, getToken, type AppCheck } from "firebase/app-check";
-import type { FirebaseApp } from "firebase/app";
+import { getApp } from "firebase/app";
 
-let appCheckInstance: AppCheck | null = null;
-let initializationAttempted = false;
+// App Check is completely disabled in development mode
+// No debug token needed
 
-const APP_CHECK_WARNING =
-  "Firebase App Check is not initialised because NEXT_PUBLIC_FIREBASE_APP_CHECK_KEY is missing. App Check protected endpoints will reject requests in production.";
+let _appCheck: AppCheck | null | undefined;
+let _tokenFetchErrorLogged = false; // Rate limit console warnings
 
-export function ensureAppCheck(firebaseApp: FirebaseApp): AppCheck | null {
+/**
+ * Environment-aware App Check initialization:
+ * - PRODUCTION: Initializes with reCAPTCHA v3 and auto token refresh
+ * - NON-PRODUCTION: Completely disabled - returns null
+ */
+export function getAppCheck(): AppCheck | null {
+  // Server-side guard
   if (typeof window === "undefined") {
-    console.log("ensureAppCheck: Running on server-side, skipping");
     return null;
   }
 
-  if (appCheckInstance) {
-    console.log("ensureAppCheck: Already initialized, returning existing instance");
-    return appCheckInstance;
+  // Return cached instance if already initialized
+  if (_appCheck !== undefined) {
+    return _appCheck ?? null;
   }
 
-  console.log("ensureAppCheck: First initialization attempt...");
+  const app = getApp();
+  const isProd = process.env.NODE_ENV === "production";
 
-  // Optional: enable App Check debug token via env flag.
-  // Set NEXT_PUBLIC_APPCHECK_DEBUG=1 in .env.local to use debug tokens locally.
-  if (process.env.NEXT_PUBLIC_APPCHECK_DEBUG === "1") {
-    console.log("ensureAppCheck: Debug mode enabled - setting FIREBASE_APPCHECK_DEBUG_TOKEN=true");
-    const extendedWindow = window as typeof window & {
-      FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean;
-    };
-    extendedWindow.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-  }
+  // Resolve reCAPTCHA site key from environment
+  const key =
+    process.env.NEXT_PUBLIC_RECAPTCHA_KEY ||
+    process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_KEY ||
+    // @ts-expect-error - Vite fallback for repos that use import.meta.env
+    (typeof import.meta !== "undefined" && import.meta.env?.VITE_RECAPTCHA_KEY) ||
+    "";
 
-  const siteKey = process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_KEY;
-
-  if (!siteKey) {
-    if (!initializationAttempted) {
-      console.error(APP_CHECK_WARNING);
-      console.error("Current environment variables:", {
-        hasAppCheckKey: !!process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_KEY,
-        appCheckDebug: process.env.NEXT_PUBLIC_APPCHECK_DEBUG
-      });
-      initializationAttempted = true;
-    }
+  // ═══════════════════════════════════════════════════════════
+  // NON-PRODUCTION: Completely disable App Check
+  // ═══════════════════════════════════════════════════════════
+  if (!isProd) {
+    console.log("🔓 App Check DISABLED in development mode");
+    console.log("   → No reCAPTCHA or token validation required");
+    _appCheck = null;
     return null;
   }
 
-  console.log("ensureAppCheck: App Check key found, initializing with reCAPTCHA v3...");
-  console.log("Site key (first 20 chars):", siteKey.substring(0, 20) + "...");
+  // ═══════════════════════════════════════════════════════════
+  // PRODUCTION: Initialize App Check with reCAPTCHA v3
+  // ═══════════════════════════════════════════════════════════
+  if (!key) {
+    console.error("❌ NEXT_PUBLIC_RECAPTCHA_KEY is missing in production.");
+    console.error("   → Add to .env.local: NEXT_PUBLIC_RECAPTCHA_KEY=your_site_key");
+    console.error("   → Get site key from Firebase Console > App Check > Web App");
+    _appCheck = null;
+    return null;
+  }
 
   try {
-    // IMPORTANT: Using reCAPTCHA v3 provider to match Console configuration
-    appCheckInstance = initializeAppCheck(firebaseApp, {
-      provider: new ReCaptchaV3Provider(siteKey),
+    console.log("🔒 Initializing Firebase App Check (production mode)...");
+    console.log("   → Domain:", window.location.hostname);
+    console.log("   → Site key:", key.substring(0, 20) + "...");
+
+    _appCheck = initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(key),
       isTokenAutoRefreshEnabled: true,
     });
-    initializationAttempted = true;
-    console.log("✓ App Check instance created successfully");
-    return appCheckInstance;
+
+    console.log("✓ App Check initialized successfully");
+
+    // Verify token fetch works (async, non-blocking)
+    getToken(_appCheck, false)
+      .then(() => {
+        console.log("✓ App Check token obtained successfully");
+      })
+      .catch((tokenError) => {
+        if (!_tokenFetchErrorLogged) {
+          _tokenFetchErrorLogged = true; // Rate limit
+          console.error("");
+          console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+          console.error("⚠️  App Check token fetch FAILED");
+          console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+          console.error("");
+          console.error("Error:", tokenError?.message || tokenError);
+          console.error("Code:", tokenError?.code);
+          console.error("");
+          console.error("🔧 TROUBLESHOOTING:");
+          console.error("");
+          console.error("1. CHECK DOMAIN ALLOWLIST");
+          console.error(`   → Current domain: ${window.location.hostname}`);
+          console.error("   → Go to Firebase Console > App Check > Web App");
+          console.error("   → Under reCAPTCHA settings, add 'Allowed Domains':");
+          console.error(`      ${window.location.hostname}`);
+          console.error("      *.web.app");
+          console.error("      *.firebaseapp.com");
+          console.error("      (your custom domain)");
+          console.error("");
+          console.error("2. CHECK AD BLOCKER / FIREWALL");
+          console.error("   → Ad blockers may block reCAPTCHA scripts");
+          console.error("   → Check Network tab for failed requests to google.com/recaptcha");
+          console.error("");
+          console.error("3. CHECK SITE KEY");
+          console.error(`   → Current key: ${key.substring(0, 20)}...`);
+          console.error("   → Verify in Firebase Console > App Check > Web App");
+          console.error("");
+          console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+          console.error("");
+        }
+      });
+
+    return _appCheck;
   } catch (error: any) {
-    initializationAttempted = true;
-    console.error("✗ Failed to initialise Firebase App Check:", {
-      error: error?.message || error,
-      code: error?.code,
-      stack: error?.stack
-    });
-    console.error("Possible causes:");
-    console.error("1. Invalid reCAPTCHA site key");
-    console.error("2. Domain not allowlisted in Firebase Console > App Check");
-    console.error("3. Network issues loading reCAPTCHA scripts");
-    console.error("4. CORS or Content Security Policy blocking reCAPTCHA");
+    console.error("❌ Failed to initialize Firebase App Check");
+    console.error("Error:", error?.message || error);
+    console.error("Code:", error?.code);
+    _appCheck = null;
     return null;
   }
 }
 
+/**
+ * Attempts to fetch an App Check token.
+ * In development (debug mode), this will return null since App Check is bypassed.
+ * In production, fetches a real reCAPTCHA token.
+ */
 export async function getAppCheckToken(forceRefresh = false): Promise<string | null> {
   if (typeof window === "undefined") {
-    console.warn("getAppCheckToken called on server-side (window is undefined)");
     return null;
   }
 
+  // In development mode, App Check is completely disabled
+  if (process.env.NODE_ENV !== "production") {
+    return null;
+  }
+
+  const appCheckInstance = getAppCheck();
+
   if (!appCheckInstance) {
-    console.error("App Check instance not initialized. Check if NEXT_PUBLIC_FIREBASE_APP_CHECK_KEY is set and ensureAppCheck() was called.");
+    console.error("App Check instance not initialized. Check if NEXT_PUBLIC_RECAPTCHA_KEY is set.");
     return null;
   }
 
   try {
-    console.log(`Requesting App Check token (forceRefresh: ${forceRefresh})...`);
     const result = await getToken(appCheckInstance, forceRefresh);
 
     if (!result?.token) {
-      console.error("App Check token generation returned empty result:", result);
+      console.error("App Check token generation returned empty result");
       return null;
     }
 
-    console.log("✓ App Check token obtained successfully");
     return result.token;
   } catch (error: any) {
     console.error("Failed to fetch App Check token:", {
       error: error?.message || error,
       code: error?.code,
-      stack: error?.stack
     });
 
-    // If first attempt fails, try one more time with force refresh
+    // Retry once with force refresh
     if (!forceRefresh) {
-      console.log("Retrying with forceRefresh=true...");
       try {
         const retryResult = await getToken(appCheckInstance, true);
         if (retryResult?.token) {
-          console.log("✓ App Check token obtained on retry");
           return retryResult.token;
         }
       } catch (retryError) {
-        console.error("Retry also failed:", retryError);
+        // Silent fail on retry
       }
     }
 
     return null;
   }
+}
+
+/**
+ * @deprecated Use getAppCheck() instead
+ */
+export function ensureAppCheck(): AppCheck | null {
+  console.warn("ensureAppCheck() is deprecated. Use getAppCheck() instead.");
+  return getAppCheck();
 }

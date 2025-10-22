@@ -1,8 +1,10 @@
+// CRITICAL: Import polyfills FIRST to set App Check debug token
+import '@/lib/polyfills';
+
 import type { Metadata } from 'next';
 import Script from 'next/script';
 import { Playfair_Display, PT_Sans } from 'next/font/google';
 import './globals.css';
-import '@/lib/polyfills';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/toaster';
 import Header from '@/components/header';
@@ -27,6 +29,8 @@ const ptSans = PT_Sans({
 
 const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 const searchConsoleVerification = process.env.NEXT_PUBLIC_SEARCH_CONSOLE_VERIFICATION;
+const appCheckDebugToken =
+  process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_DEBUG_TOKEN || 'tourfeedbackhub-dev-debug-token';
 
 export async function generateMetadata(): Promise<Metadata> {
   const siteSettings = await getSiteSettings();
@@ -72,6 +76,39 @@ export default async function RootLayout({
         {searchConsoleVerification && (
           <meta name="google-site-verification" content={searchConsoleVerification} />
         )}
+        {/* CRITICAL: Inline script to set Firebase App Check debug token IMMEDIATELY */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+(function() {
+  // Detect if running in development (localhost or LAN)
+  var isLocalhost = window.location.hostname === 'localhost' ||
+                    window.location.hostname === '127.0.0.1' ||
+                    window.location.hostname.indexOf('192.168.') === 0 ||
+                    window.location.hostname.indexOf('10.') === 0 ||
+                    /^172\\.(1[6-9]|2\\d|3[01])\\./.test(window.location.hostname);
+
+  var isHTTP = window.location.protocol === 'http:';
+
+  // Enable debug token for local development
+  if (isLocalhost && isHTTP) {
+    self.FIREBASE_APPCHECK_DEBUG_TOKEN = '${appCheckDebugToken}';
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🔓 Firebase App Check Debug Token ENABLED (inline script)');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('Domain: ' + window.location.hostname);
+    console.log('Protocol: ' + window.location.protocol);
+    console.log('Debug token: ${appCheckDebugToken}');
+    console.log('');
+    console.log('✅ Firebase Auth/Firestore will work without reCAPTCHA');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  } else {
+    console.log('🔒 Production mode - App Check will enforce reCAPTCHA');
+  }
+})();
+            `,
+          }}
+        />
         <Script id="crypto-polyfill" strategy="beforeInteractive">
           {`
             (function() {

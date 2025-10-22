@@ -53,8 +53,11 @@ Sao chép `.env.example` (nếu có) hoặc đặt trực tiếp trong Firebase 
 # Cài đặt dependencies
 npm install
 
-# Chạy development server
+# Chạy development server (localhost only)
 npm run dev
+
+# Chạy development server cho LAN/Mobile testing
+npm run dev:lan
 
 # Build production
 npm run build
@@ -63,7 +66,62 @@ npm run build
 npm start
 ```
 
-Server sẽ chạy tại `http://localhost:9002`
+### Development URLs:
+
+- **Localhost**: `http://localhost:9002`
+- **LAN/Mobile**: `http://<YOUR_LAN_IP>:9002` (e.g., `http://192.168.1.11:9002`)
+
+### Testing on Mobile Devices (LAN):
+
+1. **Start LAN dev server**:
+   ```bash
+   npm run dev:lan
+   ```
+
+2. **Find your LAN IP**:
+   - **Windows**: `ipconfig` (look for IPv4 Address)
+   - **macOS/Linux**: `ifconfig` or `ip addr` (look for inet address, usually 192.168.x.x)
+
+3. **Connect from mobile**:
+   - Ensure mobile is on the same Wi-Fi network
+   - Open browser and navigate to: `http://<YOUR_LAN_IP>:9002`
+   - Example: `http://192.168.1.11:9002/admin`
+
+4. **Firebase App Check behavior**:
+   - ✅ **Development mode**: App Check is **BYPASSED** (works on any domain/IP)
+   - 🔒 **Production mode**: App Check is **ENFORCED** with reCAPTCHA v3
+   - No need to add `192.168.x.x` to Firebase Console in dev mode!
+
+### Production Deployment (Firebase App Check Setup):
+
+When deploying to production, you **MUST** configure Firebase App Check:
+
+1. **Get reCAPTCHA v3 site key**:
+   - Go to: [Firebase Console](https://console.firebase.google.com) > **App Check** > **Web App**
+   - Register your app with **reCAPTCHA v3** provider
+   - Copy the site key
+
+2. **Add to environment variables**:
+   ```bash
+   # In .env.local (for local production builds)
+   NEXT_PUBLIC_RECAPTCHA_KEY=your_site_key_here
+   ```
+
+3. **Add production domains to App Check allowlist**:
+   - Go to: Firebase Console > **App Check** > Click your web app
+   - Under **reCAPTCHA settings**, add **Allowed Domains**:
+     - `your-project.web.app`
+     - `your-project.firebaseapp.com`
+     - `*.web.app` (if using Firebase Hosting)
+     - Your custom domain (if applicable)
+
+4. **Test production build locally**:
+   ```bash
+   NODE_ENV=production npm run build
+   npm start
+   ```
+
+**Important**: Never commit `.env.local` with real keys to version control!
 
 ## Upload Media cho Tour
 

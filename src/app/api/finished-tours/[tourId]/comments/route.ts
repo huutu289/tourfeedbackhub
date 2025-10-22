@@ -21,6 +21,8 @@ export async function POST(request: Request, { params }: { params: { tourId: str
     return NextResponse.json({ error: 'Firebase admin is not configured' }, { status: 500 });
   }
 
+  const { firestore } = admin;
+
   let payload: unknown;
   try {
     payload = await request.json();
@@ -36,23 +38,30 @@ export async function POST(request: Request, { params }: { params: { tourId: str
   const { authorName, rating, message } = parsed.data;
 
   try {
-    await admin.firestore
-      .collection('tours')
-      .doc(tourId)
-      .collection('comments')
-      .add({
-        authorName,
-        rating,
-        message,
-        createdAt: new Date(),
-      });
+    const tourSnapshot = await firestore.collection('tours').doc(tourId).get();
+    if (!tourSnapshot.exists) {
+      return NextResponse.json({ error: 'Tour not found' }, { status: 404 });
+    }
 
-    revalidatePath(`/tours/${tourId}`);
+    const tourData = tourSnapshot.data() ?? {};
+    const tourName = typeof tourData.name === 'string' ? tourData.name : tourData.title ?? '';
 
-    return NextResponse.json({ success: true });
+    await firestore.collection('reviews').add({
+      authorDisplay: authorName,
+      country: '',
+      language: 'en',
+      rating,
+      message,
+      tourId,
+      tourName,
+      status: 'pending',
+      reviewType: 'finishedTour',
+      createdAt: new Date(),
+    });
+
+    return NextResponse.json({ success: true, requiresApproval: true });
   } catch (error) {
     console.error('Failed to submit finished tour comment', error);
     return NextResponse.json({ error: 'Failed to submit comment' }, { status: 500 });
   }
 }
-

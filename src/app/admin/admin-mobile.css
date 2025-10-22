@@ -1,0 +1,508 @@
+/**
+ * Admin CMS Mobile Responsive Styles
+ * Tự động resize font và components cho màn hình nhỏ
+ */
+
+/* ============================================
+   RESPONSIVE FONT SCALING
+   ============================================ */
+
+/* Base font size scaling cho màn hình nhỏ */
+@media (max-width: 640px) {
+  .admin-page {
+    /* Reduce base font size on small screens */
+    font-size: 14px;
+  }
+
+  /* Headings auto-scale */
+  .admin-page h1 {
+    font-size: 1.5rem !important; /* 24px */
+    line-height: 1.3;
+  }
+
+  .admin-page h2 {
+    font-size: 1.25rem !important; /* 20px */
+    line-height: 1.3;
+  }
+
+  .admin-page h3 {
+    font-size: 1.125rem !important; /* 18px */
+    line-height: 1.3;
+  }
+
+  .admin-page h4,
+  .admin-page h5,
+  .admin-page h6 {
+    font-size: 1rem !important; /* 16px */
+    line-height: 1.4;
+  }
+
+  /* Paragraphs và body text */
+  .admin-page p,
+  .admin-page span,
+  .admin-page div {
+    font-size: 0.875rem; /* 14px */
+    line-height: 1.5;
+  }
+
+  /* Labels */
+  .admin-page label {
+    font-size: 0.8125rem !important; /* 13px */
+  }
+
+  /* Small text */
+  .admin-page .text-sm {
+    font-size: 0.75rem !important; /* 12px */
+  }
+
+  .admin-page .text-xs {
+    font-size: 0.6875rem !important; /* 11px */
+  }
+}
+
+/* Extra small screens (< 375px - iPhone SE, small phones) */
+@media (max-width: 374px) {
+  .admin-page {
+    font-size: 13px;
+  }
+
+  .admin-page h1 {
+    font-size: 1.375rem !important; /* 22px */
+  }
+
+  .admin-page h2 {
+    font-size: 1.125rem !important; /* 18px */
+  }
+
+  .admin-page h3 {
+    font-size: 1rem !important; /* 16px */
+  }
+}
+
+/* ============================================
+   CARD RESPONSIVE
+   ============================================ */
+
+@media (max-width: 640px) {
+  /* Card headers */
+  .admin-page .card-header,
+  .admin-page [class*="CardHeader"] {
+    padding: 0.875rem !important; /* Reduce padding */
+  }
+
+  .admin-page .card-title,
+  .admin-page [class*="CardTitle"] {
+    font-size: 1.125rem !important; /* 18px */
+  }
+
+  .admin-page .card-description,
+  .admin-page [class*="CardDescription"] {
+    font-size: 0.8125rem !important; /* 13px */
+  }
+
+  /* Card content */
+  .admin-page .card-content,
+  .admin-page [class*="CardContent"] {
+    padding: 0.875rem !important;
+  }
+
+  .admin-page .card,
+  .admin-page [class*="Card"] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+/* ============================================
+   BUTTON RESPONSIVE
+   ============================================ */
+
+@media (max-width: 640px) {
+  /* Buttons auto full-width on mobile */
+  .admin-page button:not(.no-mobile-full) {
+    width: min(100%, 300px);
+    min-height: 36px;
+    font-size: 0.8rem !important;
+    padding: 0.5rem 0.85rem !important;
+  }
+
+  /* Button groups stack vertically */
+  .admin-page .button-group,
+  .admin-page [class*="flex"][class*="gap"] > button:not(.no-mobile-full) {
+    width: 100%;
+  }
+
+  /* Allow explicit toolbars to stay inline */
+  .admin-page .rich-text-toolbar button {
+    width: auto;
+    min-width: 2.5rem;
+  }
+
+  .admin-page .rich-text-toolbar {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    padding-bottom: 0.3rem;
+    gap: 0.35rem !important;
+  }
+
+  .admin-page .rich-text-toolbar::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .admin-page .rich-text-toolbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 2px;
+  }
+
+  .admin-page .switch-compact {
+    width: auto !important;
+    min-width: 2.75rem;
+  }
+
+  /* Button font size */
+  .admin-page button {
+    font-size: 0.875rem !important; /* 14px */
+    padding: 0.625rem 1rem !important;
+  }
+
+  /* Small buttons */
+  .admin-page button[class*="sm"] {
+    font-size: 0.8125rem !important; /* 13px */
+    padding: 0.5rem 0.75rem !important;
+  }
+}
+
+/* ============================================
+   FORM INPUTS RESPONSIVE
+   ============================================ */
+
+@media (max-width: 640px) {
+  /* Input fields */
+  .admin-page input,
+  .admin-page textarea,
+  .admin-page select {
+    font-size: clamp(13px, 3.5vw, 15px) !important;
+    min-height: 34px;
+  }
+
+  .admin-page textarea {
+    min-height: clamp(100px, 28vh, 160px);
+  }
+
+  /* Form labels */
+  .admin-page label {
+    font-size: 0.8125rem !important; /* 13px */
+    margin-bottom: 0.375rem;
+  }
+
+  /* Form descriptions */
+  .admin-page .form-description,
+  .admin-page [class*="FormDescription"] {
+    font-size: 0.75rem !important; /* 12px */
+  }
+
+  .admin-page .category-list label,
+  .admin-page .tag-list label {
+    padding: 0.25rem 0.45rem;
+    border-radius: 0.5rem;
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .admin-page .category-list label span,
+  .admin-page .tag-list label span {
+    font-size: clamp(0.8rem, 3vw, 0.875rem);
+  }
+
+  .admin-page .category-list .peer,
+  .admin-page .tag-list .peer {
+    width: 0.82rem;
+    height: 0.82rem;
+  }
+
+  .admin-page .featured-image-frame {
+    max-height: 200px;
+  }
+
+  .admin-page .featured-image-preview {
+    object-fit: cover;
+  }
+}
+
+/* ============================================
+   TABLE RESPONSIVE
+   ============================================ */
+
+@media (max-width: 640px) {
+  /* Tables scroll horizontally on mobile */
+  .admin-page .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-page table {
+    font-size: 0.8125rem !important; /* 13px */
+    width: 100% !important;
+  }
+
+  .admin-page th,
+  .admin-page td {
+    padding: 0.5rem !important;
+    font-size: 0.8125rem !important;
+  }
+
+  /* Hide less important columns on mobile */
+  .admin-page .mobile-hidden {
+    display: none !important;
+  }
+}
+
+/* ============================================
+   SPACING RESPONSIVE
+   ============================================ */
+
+@media (max-width: 640px) {
+  /* Reduce spacing between elements */
+  .admin-page .space-y-6 > * + * {
+    margin-top: 1rem !important;
+  }
+
+  .admin-page .space-y-4 > * + * {
+    margin-top: 0.75rem !important;
+  }
+
+  .admin-page .gap-6 {
+    gap: 1rem !important;
+  }
+
+  .admin-page .gap-4 {
+    gap: 0.75rem !important;
+  }
+}
+
+/* ============================================
+   DIALOG/MODAL RESPONSIVE
+   ============================================ */
+
+@media (max-width: 640px) {
+  .admin-page [role="dialog"],
+  .admin-page .dialog,
+  .admin-page [class*="Dialog"] {
+    max-width: calc(100vw - 2rem) !important;
+    margin: 1rem !important;
+  }
+
+  .admin-page .dialog-title,
+  .admin-page [class*="DialogTitle"] {
+    font-size: 1.125rem !important;
+  }
+
+  .admin-page .dialog-description,
+  .admin-page [class*="DialogDescription"] {
+    font-size: 0.8125rem !important;
+  }
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+/* Force full width on mobile */
+.mobile-full {
+  width: 100% !important;
+}
+
+/* Stack on mobile, row on desktop */
+.mobile-stack {
+  flex-direction: column !important;
+}
+
+@media (min-width: 640px) {
+  .mobile-stack {
+    flex-direction: row !important;
+  }
+}
+
+/* Hide on mobile */
+.mobile-hide {
+  display: none !important;
+}
+
+@media (min-width: 640px) {
+  .mobile-hide {
+    display: block !important;
+  }
+}
+
+/* Show only on mobile */
+.mobile-show {
+  display: block !important;
+}
+
+@media (min-width: 640px) {
+  .mobile-show {
+    display: none !important;
+  }
+}
+
+/* Touch-friendly spacing */
+.touch-spacing {
+  padding: 0.75rem !important;
+}
+
+@media (min-width: 640px) {
+  .touch-spacing {
+    padding: 0.5rem !important;
+  }
+}
+
+/* ============================================
+   GRID RESPONSIVE
+   ============================================ */
+
+@media (max-width: 640px) {
+  /* Force single column on mobile */
+  .admin-page .grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Specific grid overrides */
+  .admin-page [class*="grid-cols"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ============================================
+   ICON RESPONSIVE
+   ============================================ */
+
+@media (max-width: 640px) {
+  /* Slightly smaller icons on mobile */
+  .admin-page svg,
+  .admin-page [class*="lucide"] {
+    width: 1.125rem !important;
+    height: 1.125rem !important;
+  }
+
+  /* Large icons */
+  .admin-page svg[class*="h-6"],
+  .admin-page svg[class*="w-6"] {
+    width: 1.25rem !important;
+    height: 1.25rem !important;
+  }
+}
+
+/* ============================================
+   BADGE/CHIP RESPONSIVE
+   ============================================ */
+
+@media (max-width: 640px) {
+  .admin-page .badge,
+  .admin-page [class*="badge"],
+  .admin-page .chip {
+    font-size: 0.6875rem !important; /* 11px */
+    padding: 0.25rem 0.5rem !important;
+  }
+}
+
+/* ============================================
+   ALERT RESPONSIVE
+   ============================================ */
+
+@media (max-width: 640px) {
+  .admin-page .alert,
+  .admin-page [class*="Alert"] {
+    font-size: 0.8125rem !important;
+    padding: 0.75rem !important;
+  }
+
+  .admin-page .alert-title,
+  .admin-page [class*="AlertTitle"] {
+    font-size: 0.875rem !important;
+  }
+
+  .admin-page .alert-description,
+  .admin-page [class*="AlertDescription"] {
+    font-size: 0.75rem !important;
+  }
+}
+
+/* ============================================
+   BREADCRUMB RESPONSIVE
+   ============================================ */
+
+@media (max-width: 640px) {
+  .admin-page .breadcrumb,
+  .admin-page nav[aria-label="breadcrumb"] {
+    font-size: 0.75rem !important;
+  }
+
+  /* Truncate long breadcrumb items */
+  .admin-page .breadcrumb-item {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* ============================================
+   SCROLL IMPROVEMENTS
+   ============================================ */
+
+/* Smooth scrolling on mobile */
+.admin-page {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Horizontal scroll indicators */
+.admin-page .scroll-x {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.admin-page .scroll-x::-webkit-scrollbar {
+  height: 6px;
+}
+
+.admin-page .scroll-x::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+}
+
+.admin-page .scroll-x::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+/* ============================================
+   LOADING STATES
+   ============================================ */
+
+@media (max-width: 640px) {
+  .admin-page .loading-text {
+    font-size: 0.875rem !important;
+  }
+
+  .admin-page .spinner {
+    width: 1.25rem !important;
+    height: 1.25rem !important;
+  }
+}
+
+/* ============================================
+   PRINT STYLES (BONUS)
+   ============================================ */
+
+@media print {
+  .admin-page .no-print,
+  .admin-page button,
+  .admin-page .sidebar,
+  .admin-page nav {
+    display: none !important;
+  }
+
+  .admin-page {
+    font-size: 12pt;
+  }
+}

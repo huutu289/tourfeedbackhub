@@ -1,9 +1,13 @@
 'use client';
 
+// CRITICAL: Import App Check FIRST to set debug token before any Firebase services
+import { getAppCheck } from '@/firebase/app-check';
+
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
@@ -33,6 +37,11 @@ export function initializeFirebase() {
 }
 
 export function getSdks(firebaseApp: FirebaseApp) {
+  if (typeof window !== 'undefined') {
+    // Initialize App Check before touching Auth so generated tokens attach to requests.
+    getAppCheck();
+  }
+
   const auth = getAuth(firebaseApp);
 
   // Set persistence to LOCAL (lưu vào localStorage, giữ đăng nhập sau khi đóng trình duyệt)
@@ -44,7 +53,8 @@ export function getSdks(firebaseApp: FirebaseApp) {
   return {
     firebaseApp,
     auth,
-    firestore: getFirestore(firebaseApp)
+    firestore: getFirestore(firebaseApp),
+    storage: getStorage(firebaseApp),
   };
 }
 

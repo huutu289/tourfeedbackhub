@@ -19,3 +19,24 @@ export { adminFeedbackApprove } from "./admin-feedback-approve";
 export { adminFeedbackReject } from "./admin-feedback-reject";
 export { adminTourUploadUrl } from "./admin-tour-upload-url";
 export { adminTourUploadDirect } from "./admin-tour-upload-direct";
+export { adminStoryUploadUrl } from "./admin-story-upload-url";
+export { adminStoryUploadDirect } from "./admin-story-upload-direct";
+
+// CMS Functions
+export {
+  publishScheduledPosts,
+  cleanupTrashedPosts,
+  updateTaxonomyCounts,
+} from "./scheduled-publishing";
+
+export {
+  sendCommentNotification,
+  sendUserWelcomeEmail,
+  sendPostPublishedNotification,
+  sendCommentApprovedNotification,
+} from "./email-notifications";
+
+export {
+  savePostVersion,
+  restorePostVersion,
+} from "./post-versioning";

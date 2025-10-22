@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
   AlertDialog,
@@ -154,9 +155,10 @@ function matchNamesToIds(names: string[], options: MultiSelectOption[]): string[
 export default function AdminFinishedToursPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
+  const router = useRouter();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedTour, setSelectedTour] = useState<WithId<Tour> | null>(null);
+  const [selectedTour] = useState<WithId<Tour> | null>(null);
   const [tourToDelete, setTourToDelete] = useState<WithId<Tour> | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const mediaFileInputRef = useRef<HTMLInputElement>(null);
@@ -308,70 +310,12 @@ export default function AdminFinishedToursPage() {
     }
   };
 
-  const matchByName = (name: string): string | undefined => {
-    const option = guideOptions.find((option) => option.label.toLowerCase() === name.toLowerCase());
-    return option?.value;
-  };
-
   const handleAddTour = () => {
-    setSelectedTour(null);
-    form.reset({
-      code: '',
-      name: '',
-      summary: '',
-      startDate: '',
-      endDate: '',
-      clientCount: 1,
-      clientNationalityIds: [],
-      clientCountry: '',
-      clientCity: '',
-      provinceIds: [],
-      itinerary: '',
-      guideId: undefined,
-      guideLanguageIds: [],
-      tourTypeIds: [],
-    });
-    resetMediaInput();
-    setIsDialogOpen(true);
+    router.push('/admin/tours/new');
   };
 
   const handleEditTour = (tour: WithId<Tour>) => {
-    setSelectedTour(tour);
-    const languageIds = tour.guideLanguageIds?.length
-      ? tour.guideLanguageIds
-      : matchNamesToIds(tour.guideLanguages ?? [], languageOptions);
-    const normalizedProvinceIds =
-      tour.provinceIds?.filter((provinceId) =>
-        provinceOptions.some((option) => option.value === provinceId)
-      ) ?? [];
-    const provinceIds =
-      normalizedProvinceIds.length > 0
-        ? normalizedProvinceIds
-        : matchNamesToIds(tour.provinces ?? [], provinceOptions);
-    const nationalityIds = tour.clientNationalityIds?.length
-      ? tour.clientNationalityIds
-      : matchNamesToIds(tour.clientNationalities ?? [], nationalityOptions);
-    const guideId = tour.guideId ?? (tour.guideName ? matchByName(tour.guideName) : undefined);
-    const tourTypeIds = tour.tourTypeIds ?? [];
-
-    form.reset({
-      code: tour.code,
-      name: tour.name,
-      summary: tour.summary,
-      startDate: tour.startDate ? formatDateInput(tour.startDate) : '',
-      endDate: tour.endDate ? formatDateInput(tour.endDate) : '',
-      clientCount: tour.clientCount,
-      clientNationalityIds: nationalityIds,
-      clientCountry: tour.clientCountry,
-      clientCity: tour.clientCity,
-      provinceIds,
-      itinerary: tour.itinerary,
-      guideId,
-      guideLanguageIds: languageIds,
-      tourTypeIds,
-    });
-    resetMediaInput();
-    setIsDialogOpen(true);
+    router.push(`/admin/tours/${tour.id}`);
   };
 
   const onSubmit = async (values: TourFormValues) => {
@@ -692,20 +636,21 @@ export default function AdminFinishedToursPage() {
   return (
     <>
       <div className="space-y-8">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-3xl font-headline font-bold">Finished Tours</h1>
             <p className="text-muted-foreground">
               Chronicle completed journeys and share them with future travellers.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
             {selectedIds.size > 0 && (
               <Button
                 variant="destructive"
                 size="sm"
                 onClick={handleBulkDelete}
                 disabled={isBulkDeleting}
+                className="w-full sm:w-auto"
               >
                 {isBulkDeleting ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -715,7 +660,12 @@ export default function AdminFinishedToursPage() {
                 Delete ({selectedIds.size})
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={handleExportTxt}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportTxt}
+              className="w-full sm:w-auto"
+            >
               <Download className="mr-2 h-4 w-4" />
               Export TXT
             </Button>
@@ -723,6 +673,7 @@ export default function AdminFinishedToursPage() {
               variant="outline"
               size="sm"
               onClick={() => document.getElementById('import-file-tours')?.click()}
+              className="w-full sm:w-auto"
             >
               <Upload className="mr-2 h-4 w-4" />
               Import File
@@ -734,32 +685,39 @@ export default function AdminFinishedToursPage() {
               className="hidden"
               onChange={handleImportFile}
             />
-            <Button variant="outline" size="sm" onClick={() => {
-              setImportText('');
-              setIsImportDialogOpen(true);
-            }}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setImportText('');
+                setIsImportDialogOpen(true);
+              }}
+              className="w-full sm:w-auto"
+            >
               <FileText className="mr-2 h-4 w-4" />
               Import Text
             </Button>
-            <Button onClick={handleAddTour}>Add Finished Tour</Button>
+            <Button className="w-full sm:w-auto" onClick={handleAddTour}>
+              Add Finished Tour
+            </Button>
           </div>
         </div>
 
         <Card>
-          <CardHeader className="gap-4 md:flex md:flex-row md:items-center md:justify-between">
-            <div>
+          <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-1">
               <CardTitle className="text-xl font-headline">Finished Tour Library</CardTitle>
               <CardDescription>Each entry appears on the public site as a diary post.</CardDescription>
             </div>
-            <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center">
               <Input
                 placeholder="Search by code, title, or guide…"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                className="md:w-64"
+                className="w-full md:w-64"
               />
               <Select value={String(pageSize)} onValueChange={(value) => setPageSize(Number(value))}>
-                <SelectTrigger className="md:w-[140px]">
+                <SelectTrigger className="w-full md:w-[140px]">
                   <SelectValue placeholder="Items per page" />
                 </SelectTrigger>
                 <SelectContent>
@@ -773,118 +731,120 @@ export default function AdminFinishedToursPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">
-                    <Checkbox
-                      checked={paginatedItems.length > 0 && selectedIds.size === paginatedItems.length}
-                      onCheckedChange={toggleSelectAll}
-                      aria-label="Select all"
-                    />
-                  </TableHead>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Tour Types</TableHead>
-                  <TableHead>Dates</TableHead>
-                  <TableHead>Guide</TableHead>
-                  <TableHead>Languages</TableHead>
-                  <TableHead>Guests</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-                <TableRow>
-                  <TableHead></TableHead>
-                  <TableHead>
-                    <Input
-                      placeholder="Search code..."
-                      value={codeSearch}
-                      onChange={(e) => setCodeSearch(e.target.value)}
-                      className="h-8"
-                    />
-                  </TableHead>
-                  <TableHead>
-                    <Input
-                      placeholder="Search title..."
-                      value={nameSearch}
-                      onChange={(e) => setNameSearch(e.target.value)}
-                      className="h-8"
-                    />
-                  </TableHead>
-                  <TableHead></TableHead>
-                  <TableHead></TableHead>
-                  <TableHead></TableHead>
-                  <TableHead></TableHead>
-                  <TableHead></TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
+            <div className="overflow-x-auto">
+              <Table className="min-w-[960px]">
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={9} className="h-24 text-center">
-                      <Loader2 className="mx-auto h-6 w-6 animate-spin text-accent" />
-                    </TableCell>
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={paginatedItems.length > 0 && selectedIds.size === paginatedItems.length}
+                        onCheckedChange={toggleSelectAll}
+                        aria-label="Select all"
+                      />
+                    </TableHead>
+                    <TableHead>Code</TableHead>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Tour Types</TableHead>
+                    <TableHead>Dates</TableHead>
+                    <TableHead>Guide</TableHead>
+                    <TableHead>Languages</TableHead>
+                    <TableHead>Guests</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ) : paginatedItems.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
-                      {filteredCount === 0 && tours.length > 0
-                        ? 'No finished tours match your search.'
-                        : 'No finished tours have been created yet.'}
-                    </TableCell>
+                    <TableHead></TableHead>
+                    <TableHead>
+                      <Input
+                        placeholder="Search code..."
+                        value={codeSearch}
+                        onChange={(e) => setCodeSearch(e.target.value)}
+                        className="h-8"
+                      />
+                    </TableHead>
+                    <TableHead>
+                      <Input
+                        placeholder="Search title..."
+                        value={nameSearch}
+                        onChange={(e) => setNameSearch(e.target.value)}
+                        className="h-8"
+                      />
+                    </TableHead>
+                    <TableHead></TableHead>
+                    <TableHead></TableHead>
+                    <TableHead></TableHead>
+                    <TableHead></TableHead>
+                    <TableHead></TableHead>
+                    <TableHead></TableHead>
                   </TableRow>
-                ) : (
-                  paginatedItems.map((tour) => (
-                    <TableRow
-                      key={tour.id}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => handleEditTour(tour)}
-                    >
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={selectedIds.has(tour.id)}
-                          onCheckedChange={() => toggleSelection(tour.id)}
-                          aria-label={`Select ${tour.code}`}
-                        />
-                      </TableCell>
-                      <TableCell className="font-medium">{tour.code}</TableCell>
-                      <TableCell>{tour.name}</TableCell>
-                      <TableCell>
-                        {tour.tourTypeIds?.map(id => tourTypeLabelMap.get(id)).filter(Boolean).join(', ') || '—'}
-                      </TableCell>
-                      <TableCell>
-                        {tour.startDate.toLocaleDateString()} — {tour.endDate.toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>{tour.guideName || '—'}</TableCell>
-                      <TableCell>{tour.guideLanguages.join(', ') || '—'}</TableCell>
-                      <TableCell>{tour.clientCount}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handleEditTour(tour)}
-                            title="Edit"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => setTourToDelete(tour)}
-                            title="Delete"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="h-24 text-center">
+                        <Loader2 className="mx-auto h-6 w-6 animate-spin text-accent" />
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  ) : paginatedItems.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                        {filteredCount === 0 && tours.length > 0
+                          ? 'No finished tours match your search.'
+                          : 'No finished tours have been created yet.'}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paginatedItems.map((tour) => (
+                      <TableRow
+                        key={tour.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => handleEditTour(tour)}
+                      >
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.has(tour.id)}
+                            onCheckedChange={() => toggleSelection(tour.id)}
+                            aria-label={`Select ${tour.code}`}
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">{tour.code}</TableCell>
+                        <TableCell>{tour.name}</TableCell>
+                        <TableCell>
+                          {tour.tourTypeIds?.map(id => tourTypeLabelMap.get(id)).filter(Boolean).join(', ') || '—'}
+                        </TableCell>
+                        <TableCell>
+                          {tour.startDate.toLocaleDateString()} — {tour.endDate.toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>{tour.guideName || '—'}</TableCell>
+                        <TableCell>{tour.guideLanguages.join(', ') || '—'}</TableCell>
+                        <TableCell>{tour.clientCount}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleEditTour(tour)}
+                              title="Edit"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => setTourToDelete(tour)}
+                              title="Delete"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
 
             {pageCount > 1 && (
               <PaginationControls currentPage={currentPage} pageCount={pageCount} onPageChange={setCurrentPage} />

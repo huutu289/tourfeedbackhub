@@ -1,40 +1,35 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- Next.js App Router pages live in `src/app`; `src/app/page.tsx` is the entry and heavy logic should live in `src/lib`.
-- UI blocks sit in `src/components` (ShadCN-based) with shared hooks in `src/hooks` and assets in `public/`.
-- Firebase client/admin configs belong in `src/firebase`, AI flows in `src/ai`, and docs and config files live at the repo root (`docs/`, `next.config.ts`, `tailwind.config.ts`).
-- Prefer path aliases such as `@/lib/example` over nested relative imports.
+- Next.js App Router bootstraps from `src/app/page.tsx`; keep route folders under `src/app`.
+- Place shared UI in `src/components`, custom hooks in `src/hooks`, reusable logic in `src/lib`, and feature helpers in `src/firebase` or `src/ai`.
+- Co-locate tests with their subjects or group them in `src/__tests__`; store static assets in `public/asset-name`.
+- Use configured path aliases such as `@/lib/example` to avoid brittle relative imports.
 
 ## Build, Test, and Development Commands
 - `npm run dev` starts the Turbopack dev server on port 9002.
-- `npm run build` generates the production bundle and `npm start` serves it for smoke tests.
-- `npm run lint` enforces Next.js ESLint rules—fix every warning.
-- `npm run typecheck` runs `tsc --noEmit` to catch type issues.
-- `npm run genkit:dev` runs local Genkit flows during AI work.
+- `npm run build` compiles the production bundle; follow with `npm start` for a local smoke check.
+- `npm run lint` runs the Next.js ESLint rules; resolve every warning before pushing.
+- `npm run typecheck` executes `tsc --noEmit` to surface typing regressions early.
+- `npm run test` (or `vitest run`) runs the Vitest suite.
 
 ## Coding Style & Naming Conventions
-- Code in TypeScript with React function components, 2-space indentation, and sub-100-character lines.
-- Name routes `page.tsx`, components `PascalCase.tsx`, utilities `camelCase.ts`, and hooks `useSomething.ts`.
-- Keep Tailwind classes near their JSX and prefer semantic, minimal utility stacks.
-- Default to ASCII; add comments only when clarifying non-obvious intent.
+- Write TypeScript React function components with 2-space indentation and keep lines under 100 characters.
+- Name route files `page.tsx`, components `PascalCase.tsx`, utilities `camelCase.ts`, and hooks `useThing.ts`.
+- Tailwind classes should remain close to the JSX that uses them; remove unused utilities as you refactor.
+- Rely on the repo ESLint/Prettier configuration to format code automatically.
 
 ## Testing Guidelines
-- Adopt Vitest with Testing Library when introducing coverage.
-- Store specs beside sources (`Component.test.tsx`) or under `src/__tests__`.
-- Keep tests deterministic and, once Vitest is wired in, expose a `test` script such as `vitest run`.
+- Use Vitest with Testing Library for deterministic, isolated UI coverage.
+- Match test filenames to their targets (e.g., `TourList.test.tsx`) and keep fixtures beside the tests that consume them.
+- Run `npm run test` before every PR and expand coverage whenever you add features or fix regressions.
 
 ## Commit & Pull Request Guidelines
-- Write concise, imperative commit messages; Conventional Commits (`feat:`, `fix:`, `docs:`) are encouraged.
-- PRs should summarize changes, link issues (`Closes #123`), and include UI evidence for visual updates.
-- Run `npm run lint` and `npm run typecheck` before review and call out deliberate follow-up tasks.
+- Follow Conventional Commits (e.g., `feat: add admin tour upload view`) written in the imperative mood.
+- Before opening a PR, rerun `npm run lint` and `npm run typecheck`, summarize changes, link issues (e.g., `Closes #123`), and provide screenshots for UI updates.
+- Document any required environment variables or follow-up tasks directly in the PR description.
 
 ## Security & Configuration Tips
-- Never commit secrets; store environment values in `.env.local` (gitignored) and escape multiline strings with `\n`.
-- Key env vars include Firebase credentials (`FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, `FIREBASE_STORAGE_BUCKET`) and client keys (`NEXT_PUBLIC_CLOUD_FUNCTIONS_BASE_URL`, `NEXT_PUBLIC_FIREBASE_APP_CHECK_KEY`, `NEXT_PUBLIC_RECAPTCHA_ENTERPRISE_KEY`).
-- Validate `firestore.rules` and index tweaks via Firebase Emulators before deploying.
-
-## Firebase & Deploy Workflows
-- Cloud Functions live under `functions/`; build with `cd functions && npm run build` before deploying.
-- Deploy functions via `firebase deploy --only functions`; deploy rules with `firebase deploy --only firestore:rules,storage`.
-- Media uploads use Cloud Functions (`adminTourUploadDirect`, `adminTourUploadUrl`) and store assets under `/tours/{tourId}/` with token-based access control—verify any rule changes against this contract.
+- Never commit secrets; store runtime credentials in `.env.local` and share securely.
+- Key env vars include `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, `FIREBASE_STORAGE_BUCKET`, `NEXT_PUBLIC_CLOUD_FUNCTIONS_BASE_URL`, `NEXT_PUBLIC_FIREBASE_APP_CHECK_KEY`, and `NEXT_PUBLIC_RECAPTCHA_ENTERPRISE_KEY`.
+- Validate Firebase rules and indexes with local emulators before deployment, and keep media uploads under `/tours/{tourId}/` with token-based access control.

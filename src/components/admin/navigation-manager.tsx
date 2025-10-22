@@ -86,6 +86,8 @@ const BASE_LINK_OPTIONS: ComboboxOption[] = [
   { value: '/stories', label: 'Stories' },
   { value: '/reviews', label: 'Reviews' },
   { value: '/finished-tours', label: 'Diaries' },
+  { value: '/blog', label: 'Posts', keywords: ['blog', 'articles'] },
+  { value: '/blog/categories', label: 'Categories', keywords: ['blog', 'topics'] },
   { value: '/about', label: 'About' },
   { value: '/contact', label: 'Contact' },
   { value: '/feedback', label: 'Feedback' },

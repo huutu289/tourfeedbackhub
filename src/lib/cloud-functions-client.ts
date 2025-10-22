@@ -239,4 +239,65 @@ export async function uploadTourMedia(tourId: string, file: File): Promise<strin
   }
 }
 
+export async function uploadStoryCover(storyId: string, file: File): Promise<string> {
+  try {
+    const idToken = await getIdToken();
+    if (!idToken) {
+      throw new Error('Not authenticated. Please sign in again.');
+    }
+
+    const useDirectUpload = file.size < 8 * 1024 * 1024;
+
+    if (useDirectUpload) {
+      const fileBuffer = await file.arrayBuffer();
+      const base64Data = btoa(
+        new Uint8Array(fileBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+      );
+
+      const response = await callFunction(
+        'adminStoryUploadDirect',
+        {
+          storyId,
+          fileName: file.name,
+          contentType: file.type,
+          size: file.size,
+          fileData: base64Data,
+        },
+        { Authorization: `Bearer ${idToken}` }
+      );
+
+      if (!response.success || !response.downloadUrl) {
+        throw new Error(response.error?.message || 'Upload failed');
+      }
+
+      return response.downloadUrl as string;
+    } else {
+      const response = await callFunction(
+        'adminStoryUploadUrl',
+        {
+          storyId,
+          fileName: file.name,
+          contentType: file.type,
+          size: file.size,
+        },
+        { Authorization: `Bearer ${idToken}` }
+      );
+
+      if (!response.success || !response.uploadDetails || !response.downloadUrl) {
+        throw new Error(response.error?.message || 'Upload failed');
+      }
+
+      await uploadAttachment(response.uploadDetails, file, idToken);
+
+      return response.downloadUrl as string;
+    }
+  } catch (error) {
+    console.error('uploadStoryCover error:', error);
+    if (error instanceof Error) {
+      throw new Error(`Cover upload failed for "${file.name}": ${error.message}`);
+    }
+    throw error;
+  }
+}
+
 export type ClientReview = Pick<Review, "id" | "authorDisplay" | "country" | "language" | "rating" | "message" | "tourId" | "tourName" | "photoUrls" | "createdAt" | "summary">;

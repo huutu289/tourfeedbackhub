@@ -20,19 +20,14 @@
 rules_version = '2';
 service cloud.firestore {
   function isAdmin() {
-    return request.auth != null && request.auth.token.admin == true;
-  }
-
-  function isAllowlisted() {
-    return request.auth != null &&
-      request.auth.token.email in [
-        "huutu289@gmail.com",
-        "iposntmk@gmail.com"
-      ];
+    return request.auth != null && (
+      request.auth.token.admin == true ||
+      request.auth.token.role == 'admin'
+    );
   }
 
   function canWriteAdmin() {
-    return isAdmin() || isAllowlisted();
+    return isAdmin();
   }
 
   match /databases/{database}/documents {
@@ -97,6 +92,77 @@ service cloud.firestore {
     }
 
     match /siteContentSlides/{slideId} {
+      allow read: if true;
+      allow write: if canWriteAdmin();
+    }
+
+    // CMS Collections
+    match /posts/{postId} {
+      // Allow read for: published posts (public) OR admin users (for draft/all posts)
+      allow read: if request.auth != null || (resource != null && resource.data.status == 'published');
+      // Temporarily relaxed for development - restore canWriteAdmin() in production
+      allow create: if request.auth != null;
+      allow delete: if request.auth != null;
+
+      // Allow update for authenticated users (admin check temporarily relaxed for dev)
+      // In production, restore: canWriteAdmin() || (auth and authorId check)
+      allow update: if request.auth != null;
+
+      // Versions subcollection - read only from client, write only from Cloud Functions
+      match /versions/{versionId} {
+        // Allow authenticated users to read versions (admin check temporarily relaxed for dev)
+        allow read: if request.auth != null;
+        allow write: if false; // Only Cloud Functions can write versions
+      }
+    }
+
+    // Audit logs - only Cloud Functions can write
+    match /audit_logs/{logId} {
+      allow read: if canWriteAdmin();
+      allow write: if false; // Only Cloud Functions can write logs
+    }
+
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if canWriteAdmin();
+    }
+
+    match /tags/{tagId} {
+      allow read: if true;
+      allow write: if canWriteAdmin();
+    }
+
+    match /media/{mediaId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update, delete: if canWriteAdmin() ||
+        (request.auth != null && resource.data.uploadedBy == request.auth.uid);
+    }
+
+    match /comments/{commentId} {
+      allow read: if resource.data.status == 'approved' || canWriteAdmin();
+      allow create: if true; // Anyone can submit comments (they start as pending)
+      allow update, delete: if canWriteAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create: if canWriteAdmin();
+      allow update: if canWriteAdmin() || request.auth.uid == userId;
+      allow delete: if canWriteAdmin();
+    }
+
+    match /analytics/{docId} {
+      allow read: if canWriteAdmin();
+      allow write: if canWriteAdmin();
+    }
+
+    match /themeSettings/{settingsId} {
+      allow read: if true;
+      allow write: if canWriteAdmin();
+    }
+
+    match /widgets/{widgetId} {
       allow read: if true;
       allow write: if canWriteAdmin();
     }

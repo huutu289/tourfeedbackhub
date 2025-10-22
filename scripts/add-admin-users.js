@@ -6,7 +6,7 @@
 require('dotenv').config({ path: '.env.local' });
 
 const { initializeApp, cert } = require('firebase-admin/app');
-const { getFirestore } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
 
 // Initialize Firebase Admin
@@ -55,17 +55,34 @@ async function addAdminUsers() {
       }
 
       // Set custom claims for admin role
-      await auth.setCustomUserClaims(user.uid, { admin: true });
+      await auth.setCustomUserClaims(user.uid, {
+        role: 'admin',
+        admin: true,
+      });
       console.log(`✓ Set admin claims for: ${email}`);
 
-      // Create/update admin role document in Firestore
-      await db.collection('admins').doc(user.uid).set({
-        email: user.email,
+      const displayName = user.displayName && user.displayName.trim().length > 0
+        ? user.displayName
+        : email;
+
+      const userDocRef = db.collection('users').doc(user.uid);
+      const existingDoc = await userDocRef.get();
+
+      const timestampFields = existingDoc.exists
+        ? { updatedAt: FieldValue.serverTimestamp() }
+        : {
+            createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          };
+
+      await userDocRef.set({
+        email,
+        displayName,
         role: 'admin',
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        status: 'active',
+        ...timestampFields,
       }, { merge: true });
-      console.log(`✓ Added admin document for: ${email}\n`);
+      console.log(`✓ Upserted user document for: ${email}\n`);
 
     } catch (error) {
       console.error(`✗ Error processing ${email}:`, error.message, '\n');

@@ -7,6 +7,7 @@ import { getPublicContent } from '@/lib/content-service';
 import { getFinishedTourComments } from '@/lib/finished-tour-comments';
 import type { FinishedTourComment } from '@/lib/types';
 import { FinishedTourCommentForm } from '@/components/finished-tour/comment-form';
+import { MediaCarousel } from '@/components/finished-tour/media-carousel';
 
 interface TourPageProps {
   params: {
@@ -59,88 +60,110 @@ export default async function FinishedTourPage({ params }: TourPageProps) {
     year: 'numeric',
   })}`;
 
+  const galleryPhotos = tour.photoUrls;
+
   return (
-    <div className="pb-20">
-      <section className="relative h-[40vh] w-full">
-        {tour.photoUrls[0] && (
-          <Image
-            src={tour.photoUrls[0]}
-            alt={tour.name}
-            fill
-            priority
-            className="object-cover"
-            sizes="100vw"
-          />
-        )}
-        <div className="absolute inset-0 bg-black/50" />
-        <div className="relative z-10 flex h-full flex-col items-center justify-center px-4 text-center text-white">
-          <p className="text-sm uppercase tracking-[0.3em] text-white/80">Finished tour diary</p>
-          <h1 className="mt-2 text-3xl md:text-5xl font-headline font-bold">{tour.name}</h1>
-          <p className="mt-4 max-w-3xl text-base md:text-lg text-white/80">{tour.summary}</p>
+    <div className="pb-20 bg-gradient-to-b from-background via-background/80 to-muted/40">
+      <section className="relative flex flex-col overflow-hidden bg-background md:flex-row">
+        <div className="relative h-[22rem] w-full overflow-hidden md:h-[26rem] md:flex-1">
+          {tour.photoUrls[0] && (
+            <Image
+              src={tour.photoUrls[0]}
+              alt={tour.name}
+              fill
+              priority
+              className="object-cover"
+              sizes="60vw"
+            />
+          )}
+        </div>
+        <div className="relative flex min-h-[22rem] w-full flex-1 items-center justify-center overflow-hidden bg-gradient-to-r from-black/85 via-black/70 to-black/60 px-4 py-16 text-center text-white">
+          <div className="absolute inset-0 opacity-20">
+            {tour.photoUrls[0] && (
+              <Image
+                src={tour.photoUrls[0]}
+                alt=""
+                fill
+                priority
+                className="object-cover blur-sm"
+                sizes="100vw"
+              />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-tr from-black/85 via-black/60 to-black/40" />
+          </div>
+          <div className="relative z-10 max-w-2xl space-y-4">
+            <p className="text-xs md:text-sm uppercase tracking-[0.35em] text-white/70">Finished tour diary</p>
+            <h1 className="text-3xl md:text-5xl font-headline font-bold">{tour.name}</h1>
+            <p className="text-sm md:text-lg text-white/80">{tour.summary}</p>
+          </div>
         </div>
       </section>
 
       <section className="container mx-auto px-4">
-        <div className="mt-12 grid gap-12 lg:grid-cols-[2fr_1fr]">
+        <div className="mt-12 grid gap-10 xl:grid-cols-[2fr_1fr]">
           <div className="space-y-10">
-            <Card>
+            <Card className="shadow-lg">
               <CardHeader>
                 <CardTitle className="text-xl font-headline">Highlights</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4 text-sm text-muted-foreground">
-                <div className="flex flex-wrap gap-4 text-foreground/80 text-sm">
-                  <span className="flex items-center gap-2">
-                    <CalendarRange className="h-4 w-4 text-accent" />
-                    {formattedDateRange}
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-accent" />
-                    {tour.clientCity}, {tour.clientCountry}
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-accent" />
-                    {tour.clientCount} travellers
-                  </span>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-foreground/80 text-sm">Nationalities represented</h3>
-                  <p>{tour.clientNationalities.join(', ') || 'Not recorded'}</p>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-foreground/80 text-sm">Guide</h3>
-                  <p>
-                    {tour.guideName}
-                  </p>
-                  {tour.guideLanguages?.length ? (
-                    <p className="text-sm text-muted-foreground">
-                      Languages: {tour.guideLanguages.join(', ')}
-                    </p>
-                  ) : null}
-                  {averageRating !== null && (
-                    <p className="mt-1 flex flex-wrap gap-4 text-xs uppercase tracking-wide text-muted-foreground">
-                      <span>Average rating {averageRating.toFixed(1)} / 5</span>
-                      <span>{ratingAggregate.count} traveller {ratingAggregate.count === 1 ? 'review' : 'reviews'}</span>
-                    </p>
-                  )}
-                </div>
-                {tour.provinces?.length ? (
-                  <div>
-                    <h3 className="font-semibold text-foreground/80 text-sm">Provinces visited</h3>
-                    <p>{tour.provinces.join(', ')}</p>
+              <CardContent className="grid gap-6 text-sm text-muted-foreground lg:grid-cols-2">
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center gap-3 text-foreground/80 text-sm">
+                    <span className="flex items-center gap-2">
+                      <CalendarRange className="h-4 w-4 text-accent" />
+                      {formattedDateRange}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-accent" />
+                      {tour.clientCity}, {tour.clientCountry}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-accent" />
+                      {tour.clientCount} travellers
+                    </span>
                   </div>
-                ) : null}
-                {tour.tourTypeIds && tour.tourTypeIds.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold text-foreground/80 text-sm">Nationalities represented</h3>
+                    <p>{tour.clientNationalities.join(', ') || 'Not recorded'}</p>
+                  </div>
                   <div>
                     <h3 className="font-semibold text-foreground/80 text-sm">Tour styles</h3>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {tour.tourTypeIds.map((typeId) => (
-                        <Badge key={typeId} variant="secondary">
-                          {tourTypeMap.get(typeId) ?? 'Experience'}
-                        </Badge>
-                      ))}
+                      {tour.tourTypeIds?.length ? (
+                        tour.tourTypeIds.map((typeId) => (
+                          <Badge key={typeId} variant="secondary">
+                            {tourTypeMap.get(typeId) ?? 'Experience'}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-muted-foreground">Curated private journey</span>
+                      )}
                     </div>
                   </div>
-                )}
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-semibold text-foreground/80 text-sm">Lead guide</h3>
+                    <p className="text-foreground">{tour.guideName}</p>
+                    {tour.guideLanguages?.length ? (
+                      <p className="text-sm text-muted-foreground">
+                        Languages: {tour.guideLanguages.join(', ')}
+                      </p>
+                    ) : null}
+                    {averageRating !== null && (
+                      <p className="mt-2 flex flex-wrap gap-4 text-xs uppercase tracking-wide text-muted-foreground">
+                        <span>Average rating {averageRating.toFixed(1)} / 5</span>
+                        <span>{ratingAggregate.count} traveller {ratingAggregate.count === 1 ? 'review' : 'reviews'}</span>
+                      </p>
+                    )}
+                  </div>
+                  {tour.provinces?.length ? (
+                    <div>
+                      <h3 className="font-semibold text-foreground/80 text-sm">Provinces visited</h3>
+                      <p>{tour.provinces.join(', ')}</p>
+                    </div>
+                  ) : null}
+                </div>
               </CardContent>
             </Card>
 
@@ -155,31 +178,13 @@ export default async function FinishedTourPage({ params }: TourPageProps) {
               </CardContent>
             </Card>
 
-            {(tour.photoUrls.length > 1 || tour.videoUrls.length > 0) && (
-              <Card>
+            {(galleryPhotos.length > 0 || tour.videoUrls.length > 0) && (
+              <Card className="shadow-lg">
                 <CardHeader>
                   <CardTitle className="text-xl font-headline">Media keepsakes</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  {tour.photoUrls.length > 1 && (
-                    <div className="grid gap-4 md:grid-cols-2">
-                      {tour.photoUrls.slice(1).map((url) => (
-                        <div key={url} className="relative h-48 w-full overflow-hidden rounded-md">
-                          <Image src={url} alt="Tour photo" fill className="object-cover" sizes="(min-width:768px) 50vw, 100vw" />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {tour.videoUrls.length > 0 && (
-                    <div className="space-y-4">
-                      {tour.videoUrls.map((url) => (
-                        <video key={url} controls className="w-full rounded-md bg-black">
-                          <source src={url} />
-                          <track kind="captions" />
-                        </video>
-                      ))}
-                    </div>
-                  )}
+                <CardContent>
+                  <MediaCarousel photos={galleryPhotos} videos={tour.videoUrls} />
                 </CardContent>
               </Card>
             )}
@@ -203,7 +208,7 @@ export default async function FinishedTourPage({ params }: TourPageProps) {
           </div>
 
           <aside className="space-y-6">
-            <Card>
+            <Card className="shadow-lg">
               <CardHeader>
                 <CardTitle className="text-xl font-headline">At a glance</CardTitle>
               </CardHeader>
@@ -230,12 +235,12 @@ export default async function FinishedTourPage({ params }: TourPageProps) {
             </Card>
 
             {tour.photoUrls[0] && (
-              <Card>
+              <Card className="shadow-lg">
                 <CardHeader>
                   <CardTitle className="text-xl font-headline">Cover moment</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="relative h-56 w-full overflow-hidden rounded-md">
+                  <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg">
                     <Image src={tour.photoUrls[0]} alt="Cover" fill className="object-cover" sizes="100vw" />
                   </div>
                 </CardContent>

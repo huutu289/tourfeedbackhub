@@ -219,7 +219,7 @@ firebase deploy --only hosting
 
 5. **Firestore**
    - [ ] Create initial collections
-   - [ ] Add admin user to `/admins` collection
+   - [ ] Seed `/users` with at least one `role: "admin"` account
    - [ ] Add sample data
 
 ### Environment Variables Setup
@@ -313,7 +313,7 @@ gs://tourfeedbackhub-474704.firebasestorage.app/
 
 ### Firestore Collections
 ```
-/admins/{userId}           (admin allowlist)
+/users/{userId}            (CMS accounts with role + status)
 /site_settings/{id}        (global settings)
 /tour_types/{tourTypeId}   (tour categories)
 /tours/{tourId}            (tour information)

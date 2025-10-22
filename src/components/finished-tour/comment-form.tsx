@@ -59,7 +59,7 @@ export function FinishedTourCommentForm({ tourId }: FinishedTourCommentFormProps
 
       toast({
         title: 'Thank you!',
-        description: 'Your guide feedback has been shared.',
+        description: 'Your guide feedback was submitted for review. It will appear once approved by our team.',
       });
       form.reset({ authorName: '', rating: 5, message: '' });
       router.refresh();
@@ -120,7 +120,10 @@ export function FinishedTourCommentForm({ tourId }: FinishedTourCommentFormProps
           )}
         />
 
-        <div className="flex justify-end">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-muted-foreground">
+            Feedback is reviewed by our editors before it appears on this diary.
+          </p>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? 'Submitting…' : 'Send guide feedback'}
           </Button>
@@ -129,4 +132,3 @@ export function FinishedTourCommentForm({ tourId }: FinishedTourCommentFormProps
     </Form>
   );
 }
-
